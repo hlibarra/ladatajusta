@@ -1,0 +1,80 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import { API_BASE } from '../../lib/api';
+
+type Publication = {
+	id: string;
+	state: string;
+	title: string;
+	summary: string;
+	body: string;
+	category?: string | null;
+	tags: string[];
+	created_at: string;
+	published_at?: string | null;
+};
+
+const { id } = Astro.params;
+
+const pub: Publication = await fetch(`${API_BASE}/api/publications/${id}`).then((r) => r.json());
+---
+
+<Layout>
+	<nav class="nav">
+		<a href="/">← Volver</a>
+	</nav>
+
+	<article class="article">
+		<h1>{pub.title}</h1>
+		<p class="summary">{pub.summary}</p>
+
+		{pub.tags?.length ? (
+			<div class="tags">
+				{pub.tags.slice(0, 10).map((t) => (
+					<span class="chip">{t}</span>
+				))}
+			</div>
+		) : null}
+
+		<pre class="body">{pub.body}</pre>
+	</article>
+</Layout>
+
+<style>
+	.nav {
+		margin-bottom: 12px;
+		opacity: 0.9;
+	}
+	.article h1 {
+		margin: 0 0 10px;
+		font-size: 1.8rem;
+		letter-spacing: -0.3px;
+	}
+	.summary {
+		margin: 0 0 12px;
+		opacity: 0.9;
+		line-height: 1.35;
+	}
+	.tags {
+		display: flex;
+		gap: 6px;
+		flex-wrap: wrap;
+		margin: 0 0 14px;
+	}
+	.chip {
+		font-size: 0.85rem;
+		padding: 4px 10px;
+		border-radius: 999px;
+		border: 1px solid rgba(255, 255, 255, 0.12);
+		opacity: 0.85;
+	}
+	.body {
+		white-space: pre-wrap;
+		margin: 0;
+		padding: 14px;
+		border-radius: 14px;
+		border: 1px solid rgba(255, 255, 255, 0.08);
+		background: rgba(255, 255, 255, 0.03);
+		line-height: 1.35;
+	}
+</style>

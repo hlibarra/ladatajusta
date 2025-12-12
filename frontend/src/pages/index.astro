@@ -1,0 +1,161 @@
+---
+import Layout from '../layouts/Layout.astro';
+import { API_BASE } from '../lib/api';
+
+type Publication = {
+	id: string;
+	state: string;
+	title: string;
+	summary: string;
+	body: string;
+	category?: string | null;
+	tags: string[];
+	created_at: string;
+	published_at?: string | null;
+};
+
+const pubs: Publication[] = await fetch(`${API_BASE}/api/publications`).then((r) => r.json());
+---
+
+<Layout>
+	<section class="hero">
+		<h1>La data justa</h1>
+		<p>Noticias resumidas y reescritas para lectura rápida.</p>
+	</section>
+
+	<section class="list">
+		{pubs.length === 0 ? (
+			<p class="empty">Todavía no hay publicaciones. Probá scrape + process + publish desde la API.</p>
+		) : (
+			pubs.map((p) => (
+				<article class="card" data-id={p.id}>
+					<a class="title" href={`/p/${p.id}`}>{p.title}</a>
+					<p class="summary">{p.summary}</p>
+					<div class="meta">
+						<div class="tags">
+							{(p.tags ?? []).slice(0, 6).map((t) => (
+								<span class="chip">{t}</span>
+							))}
+						</div>
+						<div class="votes">
+							<button class="vote" data-type="hot">Alta Data</button>
+							<button class="vote" data-type="cold">Fría Fría</button>
+							<span class="counts" aria-live="polite"></span>
+						</div>
+					</div>
+				</article>
+			))
+		)}
+	</section>
+
+	<script type="module">
+		import { API_BASE } from '../lib/api';
+
+		document.querySelectorAll('article.card').forEach((card) => {
+			const id = card.getAttribute('data-id');
+			if (!id) return;
+			const countsEl = card.querySelector('.counts');
+
+			card.querySelectorAll('button.vote').forEach((btn) => {
+				btn.addEventListener('click', async () => {
+					const voteType = btn.getAttribute('data-type');
+					if (!voteType) return;
+					try {
+						const r = await fetch(`${API_BASE}/api/publications/${id}/vote`, {
+							method: 'POST',
+							headers: { 'content-type': 'application/json' },
+							body: JSON.stringify({ vote_type: voteType }),
+						});
+						if (!r.ok) throw new Error(String(r.status));
+						const data = await r.json();
+						if (countsEl) countsEl.textContent = `↑ ${data.hot} · ↓ ${data.cold}`;
+					} catch (e) {
+						if (countsEl) countsEl.textContent = 'Error al votar';
+					}
+				});
+			});
+		});
+	</script>
+</Layout>
+
+<style>
+	.hero h1 {
+		margin: 0 0 6px;
+		font-size: 2.2rem;
+		letter-spacing: -0.5px;
+	}
+	.hero p {
+		margin: 0 0 18px;
+		opacity: 0.82;
+	}
+
+	.list {
+		display: flex;
+		flex-direction: column;
+		gap: 12px;
+	}
+	.card {
+		padding: 14px;
+		border: 1px solid rgba(255, 255, 255, 0.08);
+		border-radius: 14px;
+		background: rgba(255, 255, 255, 0.03);
+	}
+	.title {
+		display: inline-block;
+		font-weight: 750;
+		font-size: 1.1rem;
+		margin-bottom: 6px;
+	}
+	.title:hover {
+		text-decoration: underline;
+	}
+	.summary {
+		margin: 0 0 10px;
+		opacity: 0.9;
+		line-height: 1.35;
+	}
+
+	.meta {
+		display: flex;
+		gap: 12px;
+		justify-content: space-between;
+		align-items: center;
+		flex-wrap: wrap;
+	}
+	.tags {
+		display: flex;
+		gap: 6px;
+		flex-wrap: wrap;
+	}
+	.chip {
+		font-size: 0.85rem;
+		padding: 4px 10px;
+		border-radius: 999px;
+		border: 1px solid rgba(255, 255, 255, 0.12);
+		opacity: 0.85;
+	}
+	.votes {
+		display: flex;
+		gap: 8px;
+		align-items: center;
+	}
+	.vote {
+		border-radius: 10px;
+		border: 1px solid rgba(255, 255, 255, 0.14);
+		background: rgba(255, 255, 255, 0.05);
+		color: inherit;
+		padding: 6px 10px;
+		cursor: pointer;
+	}
+	.vote:hover {
+		background: rgba(255, 255, 255, 0.08);
+	}
+	.counts {
+		opacity: 0.8;
+		font-size: 0.9rem;
+	}
+	.empty {
+		opacity: 0.85;
+	}
+</style>
+

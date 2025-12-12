@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width" />
+		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+		<meta name="generator" content={Astro.generator} />
+		<title>La Data Justa</title>
+	</head>
+	<body>
+		<header class="topbar">
+			<a class="brand" href="/">La Data Justa</a>
+			<span class="tagline">noticias cortas, claras y al punto</span>
+		</header>
+		<main class="container">
+			<slot />
+		</main>
+	</body>
+</html>
+
+<style>
+	html,
+	body {
+		margin: 0;
+		width: 100%;
+		height: 100%;
+		font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji",
+			"Segoe UI Emoji";
+		background: #0b0e14;
+		color: #e6eaf2;
+	}
+
+	a {
+		color: inherit;
+		text-decoration: none;
+	}
+
+	.topbar {
+		position: sticky;
+		top: 0;
+		z-index: 10;
+		display: flex;
+		gap: 12px;
+		align-items: baseline;
+		padding: 14px 16px;
+		background: rgba(11, 14, 20, 0.85);
+		backdrop-filter: blur(10px);
+		border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+	}
+	.brand {
+		font-weight: 800;
+		letter-spacing: 0.2px;
+	}
+	.tagline {
+		opacity: 0.75;
+		font-size: 0.95rem;
+	}
+
+	.container {
+		max-width: 880px;
+		margin: 0 auto;
+		padding: 20px 16px 64px;
+	}
+</style>
