@@ -7,7 +7,7 @@ from pgvector.sqlalchemy import Vector
 from sqlalchemy import DateTime, ForeignKey, Index, String, Text, UniqueConstraint
 from sqlalchemy.dialects.postgresql import ARRAY, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-
+from typing import Optional
 from app.db.base import Base
 
 
@@ -28,7 +28,8 @@ class ScrapedArticle(Base):
 
     text_hash: Mapped[str] = mapped_column(String(64), index=True)
 
-    publication: Mapped["Publication" | None] = relationship(back_populates="scraped_article", uselist=False)
+    
+    publication: Mapped[Optional["Publication"]] = relationship(back_populates="scraped_article", uselist=False)
 
 
 class Publication(Base):
