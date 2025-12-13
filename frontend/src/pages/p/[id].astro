@@ -1,6 +1,5 @@
 ---
 import Layout from '../../layouts/Layout.astro';
-import { API_BASE } from '../../lib/api';
 
 type Publication = {
 	id: string;
@@ -15,6 +14,7 @@ type Publication = {
 };
 
 const { id } = Astro.params;
+const API_BASE = import.meta.env.PUBLIC_API_BASE_URL ?? 'http://localhost:8000';
 
 const pub: Publication = await fetch(`${API_BASE}/api/publications/${id}`).then((r) => r.json());
 ---

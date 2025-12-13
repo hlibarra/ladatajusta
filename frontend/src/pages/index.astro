@@ -1,6 +1,5 @@
 ---
 import Layout from '../layouts/Layout.astro';
-import { API_BASE } from '../lib/api';
 
 type Publication = {
 	id: string;
@@ -14,6 +13,7 @@ type Publication = {
 	published_at?: string | null;
 };
 
+const API_BASE = import.meta.env.PUBLIC_API_BASE_URL ?? 'http://localhost:8000';
 const pubs: Publication[] = await fetch(`${API_BASE}/api/publications`).then((r) => r.json());
 ---
 
@@ -48,8 +48,8 @@ const pubs: Publication[] = await fetch(`${API_BASE}/api/publications`).then((r)
 		)}
 	</section>
 
-	<script type="module">
-		import { API_BASE } from '../lib/api';
+	<script>
+		const API_BASE = import.meta.env.PUBLIC_API_BASE_URL ?? 'http://localhost:8000';
 
 		document.querySelectorAll('article.card').forEach((card) => {
 			const id = card.getAttribute('data-id');
@@ -158,4 +158,5 @@ const pubs: Publication[] = await fetch(`${API_BASE}/api/publications`).then((r)
 		opacity: 0.85;
 	}
 </style>
+
 
