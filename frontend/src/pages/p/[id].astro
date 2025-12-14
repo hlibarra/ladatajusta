@@ -16,65 +16,140 @@ type Publication = {
 const { id } = Astro.params;
 const API_BASE = import.meta.env.PUBLIC_API_BASE_URL ?? 'http://localhost:8000';
 
-const pub: Publication = await fetch(`${API_BASE}/api/publications/${id}`).then((r) => r.json());
+let pub: Publication | null = null;
+let error = false;
+
+try {
+	const res = await fetch(`${API_BASE}/api/publications/${id}`);
+	if (res.ok) {
+		pub = await res.json();
+	} else {
+		error = true;
+	}
+} catch (e) {
+	error = true;
+}
 ---
 
-<Layout>
-	<nav class="nav">
-		<a href="/">← Volver</a>
+<Layout title={pub?.title ?? 'Noticia'}>
+	<nav class="breadcrumb">
+		<a href="/">Inicio</a>
+		<span class="sep">/</span>
+		<span>Noticia</span>
 	</nav>
 
-	<article class="article">
-		<h1>{pub.title}</h1>
-		<p class="summary">{pub.summary}</p>
+	{error || !pub ? (
+		<div class="error-card">
+			<p>No se pudo cargar la noticia.</p>
+			<a href="/" class="back-btn">Volver al inicio</a>
+		</div>
+	) : (
+		<article class="article">
+			<header class="article-header">
+				{pub.category && <span class="category">{pub.category}</span>}
+				<time class="date">{new Date(pub.created_at).toLocaleDateString('es-AR', { day: 'numeric', month: 'long', year: 'numeric' })}</time>
+			</header>
 
-		{pub.tags?.length ? (
-			<div class="tags">
-				{pub.tags.slice(0, 10).map((t) => (
-					<span class="chip">{t}</span>
+			<h1 class="title">{pub.title}</h1>
+			
+			<p class="summary">{pub.summary}</p>
+
+			{pub.tags?.length > 0 && (
+				<div class="tags">
+					{pub.tags.slice(0, 10).map((t) => (
+						<span class="tag">{t}</span>
+					))}
+				</div>
+			)}
+
+			<div class="body-content">
+				{pub.body.split('\n').map((paragraph) => (
+					paragraph.trim() && <p>{paragraph}</p>
 				))}
 			</div>
-		) : null}
 
-		<pre class="body">{pub.body}</pre>
-	</article>
+			<footer class="article-footer">
+				<div class="votes" data-id={pub.id}>
+					<span class="votes-label">Esta noticia te parecio:</span>
+					<button class="vote-btn hot" data-type="hot">Alta Data</button>
+					<button class="vote-btn cold" data-type="cold">Fria</button>
+					<span class="vote-counts"></span>
+				</div>
+				<a href="/" class="back-link">Ver mas noticias</a>
+			</footer>
+		</article>
+	)}
 </Layout>
 
+<script>
+	const API_BASE = import.meta.env.PUBLIC_API_BASE_URL ?? 'http://localhost:8000';
+	const votesDiv = document.querySelector('.votes');
+	if (votesDiv) {
+		const id = votesDiv.getAttribute('data-id');
+		const countsEl = votesDiv.querySelector('.vote-counts');
+		votesDiv.querySelectorAll('button.vote-btn').forEach((btn) => {
+			btn.addEventListener('click', async () => {
+				const voteType = btn.getAttribute('data-type');
+				if (!voteType || !id) return;
+				try {
+					const r = await fetch(`${API_BASE}/api/publications/${id}/vote`, {
+						method: 'POST',
+						headers: { 'content-type': 'application/json' },
+						body: JSON.stringify({ vote_type: voteType }),
+					});
+					if (!r.ok) throw new Error(String(r.status));
+					const data = await r.json();
+					if (countsEl) countsEl.textContent = `Alta ${data.hot} - Fria ${data.cold}`;
+				} catch (e) {
+					if (countsEl) countsEl.textContent = 'Error al votar';
+				}
+			});
+		});
+	}
+</script>
+
 <style>
-	.nav {
-		margin-bottom: 12px;
-		opacity: 0.9;
-	}
-	.article h1 {
-		margin: 0 0 10px;
-		font-size: 1.8rem;
-		letter-spacing: -0.3px;
-	}
-	.summary {
-		margin: 0 0 12px;
-		opacity: 0.9;
-		line-height: 1.35;
-	}
-	.tags {
-		display: flex;
-		gap: 6px;
-		flex-wrap: wrap;
-		margin: 0 0 14px;
-	}
-	.chip {
-		font-size: 0.85rem;
-		padding: 4px 10px;
-		border-radius: 999px;
-		border: 1px solid rgba(255, 255, 255, 0.12);
-		opacity: 0.85;
-	}
-	.body {
-		white-space: pre-wrap;
-		margin: 0;
-		padding: 14px;
-		border-radius: 14px;
-		border: 1px solid rgba(255, 255, 255, 0.08);
-		background: rgba(255, 255, 255, 0.03);
-		line-height: 1.35;
+	.breadcrumb { display: flex; align-items: center; gap: 8px; margin-bottom: 24px; font-size: 0.9rem; }
+	.breadcrumb a { color: var(--text-secondary); }
+	.breadcrumb a:hover { color: var(--accent-secondary); }
+	.breadcrumb .sep { color: var(--text-muted); }
+	.breadcrumb span:last-child { color: var(--text-muted); }
+
+	.error-card { padding: 48px; background: var(--bg-card); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); text-align: center; }
+	.error-card p { margin: 0 0 16px; color: var(--text-secondary); }
+	.back-btn { display: inline-block; padding: 10px 20px; background: var(--accent-primary); color: white; border-radius: var(--radius-md); font-weight: 500; }
+	.back-btn:hover { background: var(--accent-secondary); color: white; }
+
+	.article { max-width: 800px; }
+
+	.article-header { display: flex; align-items: center; gap: 16px; margin-bottom: 16px; }
+	.category { padding: 6px 14px; background: rgba(59, 130, 246, 0.15); border-radius: var(--radius-sm); font-size: 0.85rem; color: var(--accent-secondary); font-weight: 500; }
+	.date { font-size: 0.9rem; color: var(--text-muted); }
+
+	.title { margin: 0 0 20px; font-size: 2.5rem; font-weight: 800; letter-spacing: -0.5px; line-height: 1.2; }
+
+	.summary { margin: 0 0 24px; font-size: 1.2rem; color: var(--text-secondary); line-height: 1.6; padding: 20px; background: var(--bg-card); border-left: 4px solid var(--accent-primary); border-radius: 0 var(--radius-md) var(--radius-md) 0; }
+
+	.tags { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 32px; }
+	.tag { padding: 6px 14px; background: var(--bg-secondary); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); font-size: 0.85rem; color: var(--text-secondary); }
+
+	.body-content { margin-bottom: 40px; }
+	.body-content p { margin: 0 0 16px; line-height: 1.8; color: var(--text-primary); font-size: 1.05rem; }
+
+	.article-footer { padding-top: 32px; border-top: 1px solid var(--border-subtle); display: flex; flex-direction: column; gap: 24px; }
+
+	.votes { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+	.votes-label { color: var(--text-secondary); font-size: 0.95rem; }
+	.vote-btn { padding: 10px 20px; background: var(--bg-card); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); color: var(--text-secondary); cursor: pointer; font-size: 0.9rem; font-weight: 500; transition: all 0.2s; }
+	.vote-btn:hover { background: var(--bg-card-hover); }
+	.vote-btn.hot:hover { border-color: #f59e0b; color: #f59e0b; }
+	.vote-btn.cold:hover { border-color: #3b82f6; color: #3b82f6; }
+	.vote-counts { color: var(--text-muted); font-size: 0.9rem; }
+
+	.back-link { color: var(--accent-secondary); font-weight: 500; }
+
+	@media (max-width: 768px) {
+		.title { font-size: 1.75rem; }
+		.summary { font-size: 1.05rem; padding: 16px; }
 	}
 </style>
