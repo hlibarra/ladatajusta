@@ -1,0 +1,348 @@
+---
+import AdminLayout from '../../layouts/AdminLayout.astro';
+---
+
+<AdminLayout title="Dashboard - Admin">
+  <div class="page-header">
+    <h1 class="page-title">Dashboard</h1>
+    <p class="page-subtitle">Vista general del sistema</p>
+  </div>
+
+  <div class="stats-grid" id="stats-grid">
+    <div class="stat-card">
+      <div class="stat-icon publications">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="24" height="24">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+          <polyline points="14 2 14 8 20 8"></polyline>
+        </svg>
+      </div>
+      <div class="stat-content">
+        <span class="stat-value" id="total-publications">-</span>
+        <span class="stat-label">Total publicaciones</span>
+      </div>
+    </div>
+
+    <div class="stat-card">
+      <div class="stat-icon published">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="24" height="24">
+          <polyline points="20 6 9 17 4 12"></polyline>
+        </svg>
+      </div>
+      <div class="stat-content">
+        <span class="stat-value" id="published-count">-</span>
+        <span class="stat-label">Publicadas</span>
+      </div>
+    </div>
+
+    <div class="stat-card">
+      <div class="stat-icon draft">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="24" height="24">
+          <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+          <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+        </svg>
+      </div>
+      <div class="stat-content">
+        <span class="stat-value" id="draft-count">-</span>
+        <span class="stat-label">Borradores</span>
+      </div>
+    </div>
+
+    <div class="stat-card">
+      <div class="stat-icon feeds">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="24" height="24">
+          <path d="M4 11a9 9 0 0 1 9 9"></path>
+          <path d="M4 4a16 16 0 0 1 16 16"></path>
+          <circle cx="5" cy="19" r="1"></circle>
+        </svg>
+      </div>
+      <div class="stat-content">
+        <span class="stat-value" id="feeds-count">-</span>
+        <span class="stat-label">Feeds activos</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="dashboard-grid">
+    <div class="card">
+      <h3 class="card-title">Votos recientes (7 dias)</h3>
+      <div class="votes-display" id="votes-display">
+        <div class="vote-stat hot">
+          <span class="vote-label">Alta Data</span>
+          <span class="vote-value" id="hot-votes">-</span>
+        </div>
+        <div class="vote-stat cold">
+          <span class="vote-label">Fria</span>
+          <span class="vote-value" id="cold-votes">-</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3 class="card-title">IA hoy</h3>
+      <div class="ai-stats">
+        <div class="ai-stat">
+          <span class="ai-label">Procesados</span>
+          <span class="ai-value" id="ai-runs">-</span>
+        </div>
+        <div class="ai-stat">
+          <span class="ai-label">Errores</span>
+          <span class="ai-value error" id="ai-errors">-</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="card full-width">
+      <h3 class="card-title">Noticias por fuente</h3>
+      <div class="sources-list" id="sources-list">
+        <p class="loading-text">Cargando...</p>
+      </div>
+    </div>
+  </div>
+</AdminLayout>
+
+<script>
+  import { authFetch } from '../../lib/auth';
+
+  async function loadStats() {
+    try {
+      const r = await authFetch('/api/stats/dashboard');
+      if (!r.ok) throw new Error('Failed to fetch stats');
+
+      const data = await r.json();
+
+      // Update stats
+      document.getElementById('total-publications')!.textContent = String(data.total_publications);
+      document.getElementById('published-count')!.textContent = String(data.by_state.published || 0);
+      document.getElementById('draft-count')!.textContent = String(data.by_state.draft || 0);
+      document.getElementById('feeds-count')!.textContent = String(data.feeds_status.active || 0);
+
+      // Votes
+      document.getElementById('hot-votes')!.textContent = String(data.recent_votes.hot || 0);
+      document.getElementById('cold-votes')!.textContent = String(data.recent_votes.cold || 0);
+
+      // AI
+      document.getElementById('ai-runs')!.textContent = String(data.ai_runs_today);
+      document.getElementById('ai-errors')!.textContent = String(data.ai_errors_today);
+
+      // Sources
+      const sourcesList = document.getElementById('sources-list')!;
+      if (data.by_source.length === 0) {
+        sourcesList.innerHTML = '<p class="empty-text">Sin datos</p>';
+      } else {
+        const maxCount = Math.max(...data.by_source.map((s: any) => s.count));
+        sourcesList.innerHTML = data.by_source.map((s: any) => `
+          <div class="source-item">
+            <span class="source-name">${s.source_name}</span>
+            <div class="source-bar-container">
+              <div class="source-bar" style="width: ${(s.count / maxCount) * 100}%"></div>
+            </div>
+            <span class="source-count">${s.count}</span>
+          </div>
+        `).join('');
+      }
+    } catch (e) {
+      console.error('Error loading stats:', e);
+    }
+  }
+
+  document.addEventListener('DOMContentLoaded', loadStats);
+</script>
+
+<style>
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 20px;
+    margin-bottom: 32px;
+  }
+
+  .stat-card {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 24px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg);
+  }
+
+  .stat-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: var(--radius-md);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .stat-icon.publications {
+    background: rgba(59, 130, 246, 0.15);
+    color: var(--accent-secondary);
+  }
+
+  .stat-icon.published {
+    background: rgba(16, 185, 129, 0.15);
+    color: var(--success);
+  }
+
+  .stat-icon.draft {
+    background: rgba(245, 158, 11, 0.15);
+    color: var(--warning);
+  }
+
+  .stat-icon.feeds {
+    background: rgba(139, 92, 246, 0.15);
+    color: #8b5cf6;
+  }
+
+  .stat-content {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .stat-value {
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: var(--text-primary);
+  }
+
+  .stat-label {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+  }
+
+  .dashboard-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 20px;
+  }
+
+  .card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg);
+    padding: 24px;
+  }
+
+  .card.full-width {
+    grid-column: 1 / -1;
+  }
+
+  .card-title {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    margin-bottom: 20px;
+  }
+
+  .votes-display {
+    display: flex;
+    gap: 32px;
+  }
+
+  .vote-stat {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .vote-label {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+  }
+
+  .vote-value {
+    font-size: 2rem;
+    font-weight: 700;
+  }
+
+  .vote-stat.hot .vote-value {
+    color: var(--accent-primary);
+  }
+
+  .vote-stat.cold .vote-value {
+    color: var(--accent-secondary);
+  }
+
+  .ai-stats {
+    display: flex;
+    gap: 32px;
+  }
+
+  .ai-stat {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .ai-label {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+  }
+
+  .ai-value {
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--text-primary);
+  }
+
+  .ai-value.error {
+    color: var(--error);
+  }
+
+  .sources-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .source-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .source-name {
+    width: 120px;
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .source-bar-container {
+    flex: 1;
+    height: 8px;
+    background: var(--bg-secondary);
+    border-radius: 4px;
+    overflow: hidden;
+  }
+
+  .source-bar {
+    height: 100%;
+    background: var(--accent-secondary);
+    border-radius: 4px;
+    transition: width 0.3s ease;
+  }
+
+  .source-count {
+    width: 40px;
+    text-align: right;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--text-primary);
+  }
+
+  .loading-text,
+  .empty-text {
+    color: var(--text-muted);
+    font-size: 0.9rem;
+  }
+
+  @media (max-width: 768px) {
+    .dashboard-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>

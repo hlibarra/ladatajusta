@@ -40,3 +40,23 @@ class VoteTotalsOut(BaseModel):
     publication_id: uuid.UUID
     hot: int
     cold: int
+
+
+class PublicationUpdate(BaseModel):
+    title: str | None = None
+    summary: str | None = None
+    body: str | None = None
+    category: str | None = None
+    tags: list[str] | None = None
+
+
+class StateChange(BaseModel):
+    state: str = Field(..., pattern="^(draft|published|discarded)$")
+
+
+class PaginatedPublications(BaseModel):
+    items: list[PublicationOut]
+    total: int
+    limit: int
+    offset: int
+    has_more: bool

@@ -2,14 +2,23 @@ from __future__ import annotations
 
 import hashlib
 import uuid
-from datetime import datetime
+from datetime import date, datetime
+from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Request
-from sqlalchemy import func, select
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
+from sqlalchemy import and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.ai.pipeline import process_article
-from app.api.schemas import PublicationOut, VoteRequest, VoteTotalsOut
+from app.api.deps import CurrentAdmin
+from app.api.schemas import (
+    PaginatedPublications,
+    PublicationOut,
+    PublicationUpdate,
+    StateChange,
+    VoteRequest,
+    VoteTotalsOut,
+)
 from app.db.models import AIRun, Publication, ScrapedArticle, Vote
 from app.db.session import get_db
 
@@ -52,6 +61,80 @@ async def list_publications(
         )
         for r in rows
     ]
+
+
+@router.get("/search", response_model=PaginatedPublications)
+async def search_publications(
+    db: AsyncSession = Depends(get_db),
+    q: Annotated[str | None, Query(description="Texto a buscar")] = None,
+    category: Annotated[str | None, Query(description="Filtrar por categoria")] = None,
+    tags: Annotated[list[str] | None, Query(description="Filtrar por tags")] = None,
+    from_date: Annotated[date | None, Query(description="Desde fecha")] = None,
+    to_date: Annotated[date | None, Query(description="Hasta fecha")] = None,
+    state: Annotated[str, Query(description="Estado")] = "published",
+    limit: Annotated[int, Query(ge=1, le=100)] = 20,
+    offset: Annotated[int, Query(ge=0)] = 0,
+) -> PaginatedPublications:
+    conditions = [Publication.state == state]
+
+    if q:
+        search_term = f"%{q}%"
+        conditions.append(
+            or_(
+                Publication.title.ilike(search_term),
+                Publication.summary.ilike(search_term),
+                Publication.body.ilike(search_term),
+            )
+        )
+
+    if category:
+        conditions.append(Publication.category == category)
+
+    if tags:
+        conditions.append(Publication.tags.overlap(tags))
+
+    if from_date:
+        conditions.append(Publication.published_at >= datetime.combine(from_date, datetime.min.time()))
+
+    if to_date:
+        conditions.append(Publication.published_at <= datetime.combine(to_date, datetime.max.time()))
+
+    # Count total
+    count_q = select(func.count()).select_from(Publication).where(and_(*conditions))
+    total = await db.scalar(count_q) or 0
+
+    # Fetch items
+    items_q = (
+        select(Publication)
+        .where(and_(*conditions))
+        .order_by(Publication.published_at.desc().nullslast(), Publication.created_at.desc())
+        .limit(limit)
+        .offset(offset)
+    )
+    rows = (await db.scalars(items_q)).all()
+
+    items = [
+        PublicationOut(
+            id=r.id,
+            state=r.state,
+            title=r.title,
+            summary=r.summary,
+            body=r.body,
+            category=r.category,
+            tags=r.tags or [],
+            created_at=r.created_at,
+            published_at=r.published_at,
+        )
+        for r in rows
+    ]
+
+    return PaginatedPublications(
+        items=items,
+        total=total,
+        limit=limit,
+        offset=offset,
+        has_more=(offset + len(items)) < total,
+    )
 
 
 @router.get("/{publication_id}", response_model=PublicationOut)
@@ -189,3 +272,120 @@ async def vote_publication(
     )
 
     return VoteTotalsOut(publication_id=publication_id, hot=int(hot or 0), cold=int(cold or 0))
+
+
+@router.put("/{publication_id}", response_model=PublicationOut)
+async def update_publication(
+    publication_id: uuid.UUID,
+    payload: PublicationUpdate,
+    admin: CurrentAdmin,
+    db: AsyncSession = Depends(get_db),
+) -> PublicationOut:
+    pub = await db.get(Publication, publication_id)
+    if not pub:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No existe")
+
+    if payload.title is not None:
+        pub.title = payload.title
+    if payload.summary is not None:
+        pub.summary = payload.summary
+    if payload.body is not None:
+        pub.body = payload.body
+    if payload.category is not None:
+        pub.category = payload.category
+    if payload.tags is not None:
+        pub.tags = payload.tags
+
+    await db.commit()
+    await db.refresh(pub)
+
+    return PublicationOut(
+        id=pub.id,
+        state=pub.state,
+        title=pub.title,
+        summary=pub.summary,
+        body=pub.body,
+        category=pub.category,
+        tags=pub.tags or [],
+        created_at=pub.created_at,
+        published_at=pub.published_at,
+    )
+
+
+@router.delete("/{publication_id}")
+async def delete_publication(
+    publication_id: uuid.UUID,
+    admin: CurrentAdmin,
+    db: AsyncSession = Depends(get_db),
+) -> Response:
+    pub = await db.get(Publication, publication_id)
+    if not pub:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No existe")
+
+    await db.delete(pub)
+    await db.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.patch("/{publication_id}/state", response_model=PublicationOut)
+async def change_state(
+    publication_id: uuid.UUID,
+    payload: StateChange,
+    admin: CurrentAdmin,
+    db: AsyncSession = Depends(get_db),
+) -> PublicationOut:
+    pub = await db.get(Publication, publication_id)
+    if not pub:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No existe")
+
+    pub.state = payload.state
+    if payload.state == "published" and pub.published_at is None:
+        pub.published_at = datetime.utcnow()
+
+    await db.commit()
+    await db.refresh(pub)
+
+    return PublicationOut(
+        id=pub.id,
+        state=pub.state,
+        title=pub.title,
+        summary=pub.summary,
+        body=pub.body,
+        category=pub.category,
+        tags=pub.tags or [],
+        created_at=pub.created_at,
+        published_at=pub.published_at,
+    )
+
+
+@router.post("/{publication_id}/restore", response_model=PublicationOut)
+async def restore_publication(
+    publication_id: uuid.UUID,
+    admin: CurrentAdmin,
+    db: AsyncSession = Depends(get_db),
+) -> PublicationOut:
+    pub = await db.get(Publication, publication_id)
+    if not pub:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No existe")
+
+    if pub.state != "discarded":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Solo se pueden restaurar publicaciones descartadas",
+        )
+
+    pub.state = "draft"
+    await db.commit()
+    await db.refresh(pub)
+
+    return PublicationOut(
+        id=pub.id,
+        state=pub.state,
+        title=pub.title,
+        summary=pub.summary,
+        body=pub.body,
+        category=pub.category,
+        tags=pub.tags or [],
+        created_at=pub.created_at,
+        published_at=pub.published_at,
+    )

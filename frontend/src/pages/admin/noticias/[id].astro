@@ -1,0 +1,357 @@
+---
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+
+const { id } = Astro.params;
+---
+
+<AdminLayout title="Editar Noticia - Admin">
+  <div class="page-header">
+    <div>
+      <a href="/admin/noticias" class="back-link">← Volver a noticias</a>
+      <h1 class="page-title">Editar Noticia</h1>
+    </div>
+    <div class="header-actions" id="header-actions"></div>
+  </div>
+
+  <div class="editor-layout">
+    <div class="editor-main">
+      <div class="card">
+        <form id="edit-form">
+          <div class="form-group">
+            <label class="form-label" for="title">Titulo</label>
+            <input type="text" id="title" name="title" class="form-input" required />
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="summary">Resumen</label>
+            <textarea id="summary" name="summary" class="form-textarea" rows="3" required></textarea>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="body">Contenido</label>
+            <textarea id="body" name="body" class="form-textarea" rows="10" required></textarea>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label" for="category">Categoria</label>
+              <input type="text" id="category" name="category" class="form-input" />
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="tags">Tags (separados por coma)</label>
+              <input type="text" id="tags" name="tags" class="form-input" placeholder="tag1, tag2, tag3" />
+            </div>
+          </div>
+
+          <div class="form-actions">
+            <button type="submit" class="btn btn-primary">Guardar cambios</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <div class="editor-sidebar">
+      <div class="card">
+        <h3 class="sidebar-title">Vista previa</h3>
+        <div class="preview-card" id="preview-card">
+          <div class="preview-category" id="preview-category"></div>
+          <h4 class="preview-title" id="preview-title">Titulo</h4>
+          <p class="preview-summary" id="preview-summary">Resumen</p>
+          <div class="preview-tags" id="preview-tags"></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3 class="sidebar-title">Estado</h3>
+        <div class="status-info">
+          <span class="status-label">Estado actual:</span>
+          <span class="badge" id="current-state">-</span>
+        </div>
+        <div class="status-actions" id="status-actions"></div>
+      </div>
+    </div>
+  </div>
+</AdminLayout>
+
+<script define:vars={{ id }}>
+  window.publicationId = id;
+</script>
+
+<script>
+  import { authFetch } from '../../../lib/auth';
+
+  declare const publicationId: string;
+
+  let publication: any = null;
+
+  async function loadPublication() {
+    try {
+      const r = await authFetch(`/api/publications/${publicationId}`);
+      if (!r.ok) {
+        window.location.href = '/admin/noticias';
+        return;
+      }
+
+      publication = await r.json();
+      populateForm();
+      updatePreview();
+      updateStatusUI();
+    } catch (e) {
+      console.error('Error:', e);
+    }
+  }
+
+  function populateForm() {
+    (document.getElementById('title') as HTMLInputElement).value = publication.title;
+    (document.getElementById('summary') as HTMLTextAreaElement).value = publication.summary;
+    (document.getElementById('body') as HTMLTextAreaElement).value = publication.body;
+    (document.getElementById('category') as HTMLInputElement).value = publication.category || '';
+    (document.getElementById('tags') as HTMLInputElement).value = (publication.tags || []).join(', ');
+  }
+
+  function updatePreview() {
+    const title = (document.getElementById('title') as HTMLInputElement).value;
+    const summary = (document.getElementById('summary') as HTMLTextAreaElement).value;
+    const category = (document.getElementById('category') as HTMLInputElement).value;
+    const tagsStr = (document.getElementById('tags') as HTMLInputElement).value;
+    const tags = tagsStr.split(',').map(t => t.trim()).filter(t => t);
+
+    document.getElementById('preview-title')!.textContent = title || 'Titulo';
+    document.getElementById('preview-summary')!.textContent = summary || 'Resumen';
+
+    const categoryEl = document.getElementById('preview-category')!;
+    if (category) {
+      categoryEl.textContent = category;
+      categoryEl.style.display = 'inline-block';
+    } else {
+      categoryEl.style.display = 'none';
+    }
+
+    const tagsEl = document.getElementById('preview-tags')!;
+    tagsEl.innerHTML = tags.map(t => `<span class="preview-tag">${t}</span>`).join('');
+  }
+
+  function updateStatusUI() {
+    const stateEl = document.getElementById('current-state')!;
+    stateEl.textContent = publication.state;
+    stateEl.className = `badge badge-${getStateBadge(publication.state)}`;
+
+    const actionsEl = document.getElementById('status-actions')!;
+    let html = '';
+
+    if (publication.state === 'draft') {
+      html = `
+        <button class="btn btn-success btn-full" id="publish-btn">Publicar</button>
+        <button class="btn btn-danger btn-full" id="discard-btn">Descartar</button>
+      `;
+    } else if (publication.state === 'published') {
+      html = `<button class="btn btn-warning btn-full" id="discard-btn">Descartar</button>`;
+    } else if (publication.state === 'discarded') {
+      html = `<button class="btn btn-secondary btn-full" id="restore-btn">Restaurar a borrador</button>`;
+    }
+
+    actionsEl.innerHTML = html;
+
+    document.getElementById('publish-btn')?.addEventListener('click', () => changeState('published'));
+    document.getElementById('discard-btn')?.addEventListener('click', () => changeState('discarded'));
+    document.getElementById('restore-btn')?.addEventListener('click', restore);
+  }
+
+  function getStateBadge(state: string): string {
+    switch (state) {
+      case 'published': return 'success';
+      case 'draft': return 'warning';
+      case 'discarded': return 'error';
+      default: return 'info';
+    }
+  }
+
+  async function changeState(state: string) {
+    try {
+      const r = await authFetch(`/api/publications/${publicationId}/state`, {
+        method: 'PATCH',
+        body: JSON.stringify({ state }),
+      });
+      if (r.ok) {
+        publication = await r.json();
+        updateStatusUI();
+      }
+    } catch (e) {
+      console.error('Error:', e);
+    }
+  }
+
+  async function restore() {
+    try {
+      const r = await authFetch(`/api/publications/${publicationId}/restore`, {
+        method: 'POST',
+      });
+      if (r.ok) {
+        publication = await r.json();
+        updateStatusUI();
+      }
+    } catch (e) {
+      console.error('Error:', e);
+    }
+  }
+
+  // Form submit
+  document.getElementById('edit-form')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    const title = (document.getElementById('title') as HTMLInputElement).value;
+    const summary = (document.getElementById('summary') as HTMLTextAreaElement).value;
+    const body = (document.getElementById('body') as HTMLTextAreaElement).value;
+    const category = (document.getElementById('category') as HTMLInputElement).value;
+    const tagsStr = (document.getElementById('tags') as HTMLInputElement).value;
+    const tags = tagsStr.split(',').map(t => t.trim()).filter(t => t);
+
+    try {
+      const r = await authFetch(`/api/publications/${publicationId}`, {
+        method: 'PUT',
+        body: JSON.stringify({ title, summary, body, category, tags }),
+      });
+
+      if (r.ok) {
+        publication = await r.json();
+        alert('Cambios guardados');
+      } else {
+        alert('Error al guardar');
+      }
+    } catch (e) {
+      console.error('Error:', e);
+      alert('Error al guardar');
+    }
+  });
+
+  // Live preview
+  ['title', 'summary', 'category', 'tags'].forEach(field => {
+    document.getElementById(field)?.addEventListener('input', updatePreview);
+  });
+
+  // Initial load
+  document.addEventListener('DOMContentLoaded', loadPublication);
+</script>
+
+<style>
+  .back-link {
+    display: inline-block;
+    color: var(--text-muted);
+    text-decoration: none;
+    font-size: 0.9rem;
+    margin-bottom: 8px;
+  }
+
+  .back-link:hover {
+    color: var(--text-secondary);
+  }
+
+  .editor-layout {
+    display: grid;
+    grid-template-columns: 1fr 350px;
+    gap: 24px;
+  }
+
+  .form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+  }
+
+  .form-actions {
+    margin-top: 24px;
+    padding-top: 24px;
+    border-top: 1px solid var(--border-subtle);
+  }
+
+  .sidebar-title {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    margin-bottom: 16px;
+  }
+
+  .preview-card {
+    padding: 16px;
+    background: var(--bg-secondary);
+    border-radius: var(--radius-md);
+  }
+
+  .preview-category {
+    display: inline-block;
+    padding: 4px 10px;
+    background: rgba(59, 130, 246, 0.15);
+    border-radius: var(--radius-sm);
+    font-size: 0.75rem;
+    color: var(--accent-secondary);
+    font-weight: 500;
+    margin-bottom: 12px;
+  }
+
+  .preview-title {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 8px;
+    line-height: 1.3;
+  }
+
+  .preview-summary {
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+    line-height: 1.5;
+    margin-bottom: 12px;
+  }
+
+  .preview-tags {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+
+  .preview-tag {
+    padding: 2px 8px;
+    background: var(--bg-card);
+    border-radius: var(--radius-sm);
+    font-size: 0.75rem;
+    color: var(--text-muted);
+  }
+
+  .status-info {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+
+  .status-label {
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+  }
+
+  .status-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .btn-full {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .editor-sidebar .card {
+    margin-bottom: 20px;
+  }
+
+  @media (max-width: 1024px) {
+    .editor-layout {
+      grid-template-columns: 1fr;
+    }
+
+    .form-row {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>

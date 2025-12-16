@@ -1,0 +1,292 @@
+---
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+---
+
+<AdminLayout title="Noticias - Admin">
+  <div class="page-header">
+    <div>
+      <h1 class="page-title">Noticias</h1>
+      <p class="page-subtitle">Gestiona las publicaciones</p>
+    </div>
+  </div>
+
+  <div class="tabs" id="state-tabs">
+    <button class="tab active" data-state="all">Todas</button>
+    <button class="tab" data-state="draft">Borradores</button>
+    <button class="tab" data-state="published">Publicadas</button>
+    <button class="tab" data-state="discarded">Descartadas</button>
+  </div>
+
+  <div class="card">
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Titulo</th>
+          <th>Categoria</th>
+          <th>Estado</th>
+          <th>Fecha</th>
+          <th>Acciones</th>
+        </tr>
+      </thead>
+      <tbody id="publications-tbody">
+        <tr>
+          <td colspan="5" class="loading-cell">Cargando...</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="pagination" id="pagination"></div>
+  </div>
+</AdminLayout>
+
+<script>
+  import { authFetch } from '../../../lib/auth';
+
+  let currentState = 'all';
+  let currentOffset = 0;
+  const limit = 20;
+
+  async function loadPublications() {
+    const tbody = document.getElementById('publications-tbody')!;
+    tbody.innerHTML = '<tr><td colspan="5" class="loading-cell">Cargando...</td></tr>';
+
+    try {
+      let url = `/api/publications/search?limit=${limit}&offset=${currentOffset}`;
+      if (currentState !== 'all') {
+        url += `&state=${currentState}`;
+      }
+
+      const r = await authFetch(url);
+      if (!r.ok) throw new Error('Failed to load');
+
+      const data = await r.json();
+
+      if (data.items.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" class="empty-cell">No hay publicaciones</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = data.items.map((p: any) => `
+        <tr data-id="${p.id}">
+          <td>
+            <a href="/admin/noticias/${p.id}" class="title-link">${p.title}</a>
+          </td>
+          <td>${p.category || '-'}</td>
+          <td>
+            <span class="badge badge-${getStateBadge(p.state)}">${p.state}</span>
+          </td>
+          <td>${formatDate(p.published_at || p.created_at)}</td>
+          <td class="actions-cell">
+            ${p.state === 'draft' ? `
+              <button class="btn btn-small btn-success publish-btn" data-id="${p.id}">Publicar</button>
+              <button class="btn btn-small btn-danger discard-btn" data-id="${p.id}">Descartar</button>
+            ` : ''}
+            ${p.state === 'discarded' ? `
+              <button class="btn btn-small btn-secondary restore-btn" data-id="${p.id}">Restaurar</button>
+            ` : ''}
+            ${p.state === 'published' ? `
+              <button class="btn btn-small btn-warning discard-btn" data-id="${p.id}">Descartar</button>
+            ` : ''}
+            <a href="/admin/noticias/${p.id}" class="btn btn-small btn-secondary">Editar</a>
+          </td>
+        </tr>
+      `).join('');
+
+      // Setup action buttons
+      setupActionButtons();
+
+      // Update pagination
+      updatePagination(data.total, data.has_more);
+    } catch (e) {
+      console.error('Error:', e);
+      tbody.innerHTML = '<tr><td colspan="5" class="error-cell">Error al cargar</td></tr>';
+    }
+  }
+
+  function getStateBadge(state: string): string {
+    switch (state) {
+      case 'published': return 'success';
+      case 'draft': return 'warning';
+      case 'discarded': return 'error';
+      default: return 'info';
+    }
+  }
+
+  function formatDate(dateStr: string): string {
+    const date = new Date(dateStr);
+    return date.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  }
+
+  function updatePagination(total: number, hasMore: boolean) {
+    const pagination = document.getElementById('pagination')!;
+    const currentPage = Math.floor(currentOffset / limit) + 1;
+    const totalPages = Math.ceil(total / limit);
+
+    pagination.innerHTML = `
+      <button class="btn btn-small btn-secondary" ${currentOffset === 0 ? 'disabled' : ''} id="prev-btn">Anterior</button>
+      <span class="page-info">Pagina ${currentPage} de ${totalPages}</span>
+      <button class="btn btn-small btn-secondary" ${!hasMore ? 'disabled' : ''} id="next-btn">Siguiente</button>
+    `;
+
+    document.getElementById('prev-btn')?.addEventListener('click', () => {
+      if (currentOffset > 0) {
+        currentOffset -= limit;
+        loadPublications();
+      }
+    });
+
+    document.getElementById('next-btn')?.addEventListener('click', () => {
+      if (hasMore) {
+        currentOffset += limit;
+        loadPublications();
+      }
+    });
+  }
+
+  function setupActionButtons() {
+    document.querySelectorAll('.publish-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const id = btn.getAttribute('data-id');
+        await changeState(id!, 'published');
+      });
+    });
+
+    document.querySelectorAll('.discard-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const id = btn.getAttribute('data-id');
+        await changeState(id!, 'discarded');
+      });
+    });
+
+    document.querySelectorAll('.restore-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const id = btn.getAttribute('data-id');
+        await restorePublication(id!);
+      });
+    });
+  }
+
+  async function changeState(id: string, state: string) {
+    try {
+      const r = await authFetch(`/api/publications/${id}/state`, {
+        method: 'PATCH',
+        body: JSON.stringify({ state }),
+      });
+      if (r.ok) {
+        loadPublications();
+      }
+    } catch (e) {
+      console.error('Error:', e);
+    }
+  }
+
+  async function restorePublication(id: string) {
+    try {
+      const r = await authFetch(`/api/publications/${id}/restore`, {
+        method: 'POST',
+      });
+      if (r.ok) {
+        loadPublications();
+      }
+    } catch (e) {
+      console.error('Error:', e);
+    }
+  }
+
+  // Tab switching
+  document.querySelectorAll('.tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+      currentState = tab.getAttribute('data-state') || 'all';
+      currentOffset = 0;
+      loadPublications();
+    });
+  });
+
+  // Initial load
+  document.addEventListener('DOMContentLoaded', loadPublications);
+</script>
+
+<style>
+  .page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 24px;
+  }
+
+  .tabs {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 24px;
+    background: var(--bg-card);
+    padding: 4px;
+    border-radius: var(--radius-md);
+    width: fit-content;
+  }
+
+  .tab {
+    padding: 10px 20px;
+    background: transparent;
+    border: none;
+    border-radius: var(--radius-sm);
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .tab:hover {
+    color: var(--text-primary);
+  }
+
+  .tab.active {
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+  }
+
+  .title-link {
+    color: var(--text-primary);
+    text-decoration: none;
+    font-weight: 500;
+  }
+
+  .title-link:hover {
+    color: var(--accent-secondary);
+  }
+
+  .actions-cell {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .btn-small {
+    padding: 6px 12px;
+    font-size: 0.8rem;
+  }
+
+  .loading-cell,
+  .empty-cell,
+  .error-cell {
+    text-align: center;
+    padding: 40px !important;
+    color: var(--text-muted);
+  }
+
+  .pagination {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    margin-top: 24px;
+    padding-top: 24px;
+    border-top: 1px solid var(--border-subtle);
+  }
+
+  .page-info {
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+  }
+</style>

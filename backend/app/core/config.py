@@ -18,6 +18,12 @@ class Settings(BaseSettings):
 
     user_agent: str = "LaDataJustaBot/0.1"
 
+    # JWT settings
+    jwt_secret: str = "change-this-secret-in-production-use-openssl-rand-hex-32"
+    jwt_algorithm: str = "HS256"
+    access_token_expire_minutes: int = 30
+    refresh_token_expire_days: int = 7
+
     @property
     def cors_origin_list(self) -> list[str]:
         return [o.strip() for o in self.cors_origins.split(",") if o.strip()]

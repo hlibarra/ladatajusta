@@ -1,0 +1,111 @@
+---
+interface Props {
+  categories?: string[];
+  selectedCategory?: string;
+}
+
+const { categories = [], selectedCategory = '' } = Astro.props;
+---
+
+<div class="filters-container" id="filters">
+  <div class="filter-group">
+    <label class="filter-label">Categoria</label>
+    <select class="filter-select" id="category-filter">
+      <option value="">Todas</option>
+      {categories.map((cat) => (
+        <option value={cat} selected={cat === selectedCategory}>{cat}</option>
+      ))}
+    </select>
+  </div>
+
+  <div class="filter-group">
+    <label class="filter-label">Desde</label>
+    <input type="date" class="filter-input" id="from-date-filter" />
+  </div>
+
+  <div class="filter-group">
+    <label class="filter-label">Hasta</label>
+    <input type="date" class="filter-input" id="to-date-filter" />
+  </div>
+
+  <button class="filter-clear" id="clear-filters">Limpiar</button>
+</div>
+
+<style>
+  .filters-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    padding: 16px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg);
+    margin-bottom: 24px;
+    align-items: flex-end;
+  }
+
+  .filter-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    flex: 1;
+    min-width: 140px;
+  }
+
+  .filter-label {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    font-weight: 500;
+  }
+
+  .filter-select,
+  .filter-input {
+    padding: 8px 12px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    color: var(--text-primary);
+    font-size: 0.9rem;
+    transition: all 0.2s ease;
+  }
+
+  .filter-select:hover,
+  .filter-input:hover {
+    border-color: var(--border-medium);
+  }
+
+  .filter-select:focus,
+  .filter-input:focus {
+    outline: none;
+    border-color: var(--accent-secondary);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  }
+
+  .filter-clear {
+    padding: 8px 16px;
+    background: transparent;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+  }
+
+  .filter-clear:hover {
+    background: var(--bg-secondary);
+    border-color: var(--border-medium);
+    color: var(--text-primary);
+  }
+
+  @media (max-width: 768px) {
+    .filters-container {
+      flex-direction: column;
+    }
+
+    .filter-group {
+      width: 100%;
+    }
+  }
+</style>

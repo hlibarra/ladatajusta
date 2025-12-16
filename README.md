@@ -53,11 +53,27 @@ npm install
 npm run dev
 ```
 
+### 6. Crear usuario administrador
+
+Para acceder al panel de administracion, primero crea el usuario admin:
+
+```powershell
+cd backend
+python -m scripts.create_admin
+```
+
+Esto crea el usuario:
+- **Email:** `admin@local.com`
+- **Password:** `admin123`
+
+Luego accede a: http://localhost:4321/admin
+
 ## URLs
 
 | Servicio | URL |
 |----------|-----|
 | Frontend | http://localhost:4321 |
+| Panel Admin | http://localhost:4321/admin |
 | Backend API | http://localhost:8000 |
 | API Docs (Swagger) | http://localhost:8000/docs |
 | Health Check | http://localhost:8000/health |
