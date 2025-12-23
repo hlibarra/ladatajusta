@@ -1,5 +1,16 @@
 ---
+export const prerender = false;
+
 import Layout from '../../layouts/Layout.astro';
+
+type Agent = {
+	id: string;
+	name: string;
+	slug: string;
+	description: string;
+	specialization?: string | null;
+	avatar_url?: string | null;
+};
 
 type Publication = {
 	id: string;
@@ -11,6 +22,7 @@ type Publication = {
 	tags: string[];
 	created_at: string;
 	published_at?: string | null;
+	agent?: Agent | null;
 };
 
 const { id } = Astro.params;
@@ -51,7 +63,28 @@ try {
 			</header>
 
 			<h1 class="title">{pub.title}</h1>
-			
+
+			{pub.agent && (
+				<div class="agent-byline">
+					<div class="agent-avatar">
+						{pub.agent.avatar_url ? (
+							<img src={pub.agent.avatar_url} alt={pub.agent.name} />
+						) : (
+							<div class="agent-avatar-placeholder">
+								{pub.agent.name.charAt(0)}
+							</div>
+						)}
+					</div>
+					<div class="agent-info">
+						<div class="agent-label">Escrito por</div>
+						<div class="agent-name">{pub.agent.name}</div>
+						{pub.agent.specialization && (
+							<div class="agent-specialization">{pub.agent.specialization}</div>
+						)}
+					</div>
+				</div>
+			)}
+
 			<p class="summary">{pub.summary}</p>
 
 			{pub.tags?.length > 0 && (
@@ -84,24 +117,90 @@ try {
 <script>
 	const API_BASE = import.meta.env.PUBLIC_API_BASE_URL ?? 'http://localhost:8000';
 	const votesDiv = document.querySelector('.votes');
+
 	if (votesDiv) {
 		const id = votesDiv.getAttribute('data-id');
 		const countsEl = votesDiv.querySelector('.vote-counts');
+		const hotBtn = votesDiv.querySelector('button.vote-btn.hot');
+		const coldBtn = votesDiv.querySelector('button.vote-btn.cold');
+
+		// Load initial counts and user vote from localStorage
+		const storageKey = `vote_${id}`;
+		let userVote = localStorage.getItem(storageKey);
+
+		// Function to update button states
+		function updateButtonStates(currentVote: string | null) {
+			hotBtn?.classList.remove('active');
+			coldBtn?.classList.remove('active');
+
+			if (currentVote === 'hot') {
+				hotBtn?.classList.add('active');
+			} else if (currentVote === 'cold') {
+				coldBtn?.classList.add('active');
+			}
+		}
+
+		// Function to fetch and display vote counts
+		async function fetchVoteCounts() {
+			try {
+				const r = await fetch(`${API_BASE}/api/stats/votes/${id}`);
+				if (r.ok) {
+					const data = await r.json();
+					if (countsEl) {
+						countsEl.textContent = `🔥 ${data.hot} · ❄️ ${data.cold}`;
+					}
+				}
+			} catch (e) {
+				console.error('Error fetching vote counts:', e);
+			}
+		}
+
+		// Initialize
+		updateButtonStates(userVote);
+		fetchVoteCounts();
+
+		// Add click handlers
 		votesDiv.querySelectorAll('button.vote-btn').forEach((btn) => {
 			btn.addEventListener('click', async () => {
 				const voteType = btn.getAttribute('data-type');
 				if (!voteType || !id) return;
+
+				// Disable buttons while voting
+				hotBtn?.setAttribute('disabled', 'true');
+				coldBtn?.setAttribute('disabled', 'true');
+
 				try {
 					const r = await fetch(`${API_BASE}/api/publications/${id}/vote`, {
 						method: 'POST',
 						headers: { 'content-type': 'application/json' },
 						body: JSON.stringify({ vote_type: voteType }),
 					});
+
 					if (!r.ok) throw new Error(String(r.status));
+
 					const data = await r.json();
-					if (countsEl) countsEl.textContent = `Alta ${data.hot} - Fria ${data.cold}`;
+
+					// Update counts
+					if (countsEl) {
+						countsEl.textContent = `🔥 ${data.hot} · ❄️ ${data.cold}`;
+					}
+
+					// Save vote to localStorage
+					localStorage.setItem(storageKey, voteType);
+					userVote = voteType;
+
+					// Update button states
+					updateButtonStates(userVote);
+
 				} catch (e) {
-					if (countsEl) countsEl.textContent = 'Error al votar';
+					console.error('Error voting:', e);
+					if (countsEl) {
+						countsEl.textContent = 'Error al votar';
+					}
+				} finally {
+					// Re-enable buttons
+					hotBtn?.removeAttribute('disabled');
+					coldBtn?.removeAttribute('disabled');
 				}
 			});
 		});
@@ -128,6 +227,65 @@ try {
 
 	.title { margin: 0 0 20px; font-size: 2.5rem; font-weight: 800; letter-spacing: -0.5px; line-height: 1.2; }
 
+	.agent-byline {
+		display: flex;
+		align-items: center;
+		gap: 16px;
+		margin: 0 0 24px;
+		padding: 16px;
+		background: var(--bg-card);
+		border: 1px solid var(--border-subtle);
+		border-radius: var(--radius-md);
+	}
+	.agent-avatar {
+		flex-shrink: 0;
+		width: 56px;
+		height: 56px;
+		border-radius: 50%;
+		overflow: hidden;
+		background: var(--bg-secondary);
+		border: 2px solid var(--border-subtle);
+	}
+	.agent-avatar img {
+		width: 100%;
+		height: 100%;
+		object-fit: cover;
+	}
+	.agent-avatar-placeholder {
+		width: 100%;
+		height: 100%;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		font-size: 1.5rem;
+		font-weight: 700;
+		color: var(--accent-primary);
+		background: linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(147, 51, 234, 0.1) 100%);
+	}
+	.agent-info {
+		flex: 1;
+		display: flex;
+		flex-direction: column;
+		gap: 2px;
+	}
+	.agent-label {
+		font-size: 0.75rem;
+		text-transform: uppercase;
+		letter-spacing: 0.5px;
+		color: var(--text-muted);
+		font-weight: 600;
+	}
+	.agent-name {
+		font-size: 1.1rem;
+		font-weight: 700;
+		color: var(--text-primary);
+	}
+	.agent-specialization {
+		font-size: 0.9rem;
+		color: var(--accent-secondary);
+		font-weight: 500;
+	}
+
 	.summary { margin: 0 0 24px; font-size: 1.2rem; color: var(--text-secondary); line-height: 1.6; padding: 20px; background: var(--bg-card); border-left: 4px solid var(--accent-primary); border-radius: 0 var(--radius-md) var(--radius-md) 0; }
 
 	.tags { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 32px; }
@@ -140,11 +298,51 @@ try {
 
 	.votes { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 	.votes-label { color: var(--text-secondary); font-size: 0.95rem; }
-	.vote-btn { padding: 10px 20px; background: var(--bg-card); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); color: var(--text-secondary); cursor: pointer; font-size: 0.9rem; font-weight: 500; transition: all 0.2s; }
-	.vote-btn:hover { background: var(--bg-card-hover); }
-	.vote-btn.hot:hover { border-color: #f59e0b; color: #f59e0b; }
-	.vote-btn.cold:hover { border-color: #3b82f6; color: #3b82f6; }
-	.vote-counts { color: var(--text-muted); font-size: 0.9rem; }
+	.vote-btn {
+		padding: 10px 20px;
+		background: var(--bg-card);
+		border: 1px solid var(--border-subtle);
+		border-radius: var(--radius-md);
+		color: var(--text-secondary);
+		cursor: pointer;
+		font-size: 0.9rem;
+		font-weight: 500;
+		transition: all 0.2s;
+		position: relative;
+	}
+	.vote-btn:hover:not(:disabled) {
+		background: var(--bg-card-hover);
+		transform: translateY(-1px);
+	}
+	.vote-btn:disabled {
+		opacity: 0.6;
+		cursor: not-allowed;
+	}
+	.vote-btn.hot:hover:not(:disabled) {
+		border-color: #f59e0b;
+		color: #f59e0b;
+	}
+	.vote-btn.hot.active {
+		background: rgba(245, 158, 11, 0.15);
+		border-color: #f59e0b;
+		color: #f59e0b;
+		font-weight: 600;
+	}
+	.vote-btn.cold:hover:not(:disabled) {
+		border-color: #3b82f6;
+		color: #3b82f6;
+	}
+	.vote-btn.cold.active {
+		background: rgba(59, 130, 246, 0.15);
+		border-color: #3b82f6;
+		color: #3b82f6;
+		font-weight: 600;
+	}
+	.vote-counts {
+		color: var(--text-muted);
+		font-size: 0.9rem;
+		font-weight: 500;
+	}
 
 	.back-link { color: var(--accent-secondary); font-weight: 500; }
 

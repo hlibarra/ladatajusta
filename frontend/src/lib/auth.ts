@@ -54,21 +54,32 @@ export async function refreshAccessToken(): Promise<boolean> {
 
 export async function login(email: string, password: string): Promise<{ success: boolean; error?: string }> {
   try {
+    console.log('=== LOGIN DEBUG ===');
+    console.log('API_BASE:', API_BASE);
+    console.log('Login URL:', `${API_BASE}/api/auth/login`);
+    console.log('Email:', email);
+
     const r = await fetch(`${API_BASE}/api/auth/login`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ email, password }),
     });
 
+    console.log('Response status:', r.status);
+    console.log('Response ok:', r.ok);
+
     if (!r.ok) {
       const data = await r.json().catch(() => ({}));
+      console.log('Error data:', data);
       return { success: false, error: data.detail || 'Error de autenticacion' };
     }
 
     const data = await r.json();
+    console.log('Success! Got tokens');
     saveTokens(data.access_token, data.refresh_token);
     return { success: true };
-  } catch {
+  } catch (err) {
+    console.error('Login exception:', err);
     return { success: false, error: 'Error de conexion' };
   }
 }

@@ -1,8 +1,16 @@
 ---
 import Layout from '../layouts/Layout.astro';
-import Filters from '../components/Filters.astro';
 import ShareButtons from '../components/ShareButtons.astro';
 import Skeleton from '../components/Skeleton.astro';
+
+interface Agent {
+	id: string;
+	name: string;
+	slug: string;
+	description: string;
+	specialization?: string | null;
+	avatar_url?: string | null;
+}
 
 interface Publication {
 	id: string;
@@ -14,6 +22,7 @@ interface Publication {
 	tags: string[];
 	created_at: string;
 	published_at?: string | null;
+	agent?: Agent | null;
 }
 
 interface PaginatedResponse {
@@ -31,96 +40,120 @@ let pubs: Publication[] = [];
 let total = 0;
 let hasMore = false;
 let error = false;
-let categories: string[] = [];
 
 try {
-	const res = await fetch(`${API_BASE}/api/publications/search?limit=20`);
+	const res = await fetch(`${API_BASE}/api/publications/search?limit=30`);
 	if (res.ok) {
 		const data: PaginatedResponse = await res.json();
 		pubs = data.items;
 		total = data.total;
 		hasMore = data.has_more;
-
-		// Extract unique categories
-		const catSet = new Set<string>();
-		pubs.forEach((p) => {
-			if (p.category) catSet.add(p.category);
-		});
-		categories = Array.from(catSet).sort();
 	} else {
 		error = true;
 	}
 } catch (e) {
 	error = true;
 }
+
+// Separar primera noticia como destacada
+const featuredPub = pubs[0];
+const remainingPubs = pubs.slice(1);
 ---
 
 <Layout>
-	<section class="hero">
-		<div class="hero-content">
-			<span class="hero-badge">Procesado por IA</span>
-			<h1 class="hero-title">La data justa</h1>
-			<p class="hero-subtitle">Noticias resumidas, reescritas y optimizadas para lectura rapida. Sin relleno, sin vueltas.</p>
-			<div class="hero-stats">
-				<div class="stat">
-					<span class="stat-value" id="total-count">{total}</span>
-					<span class="stat-label">Noticias</span>
-				</div>
-				<div class="stat">
-					<span class="stat-value">24/7</span>
-					<span class="stat-label">Actualizacion</span>
-				</div>
-				<div class="stat">
-					<span class="stat-value">IA</span>
-					<span class="stat-label">Procesamiento</span>
-				</div>
-			</div>
+	{error ? (
+		<div class="error-card">
+			<p>No se pudo conectar con el servidor.</p>
 		</div>
-	</section>
-
-	<Filters categories={categories} />
-
-	<section class="news-section">
-		<div class="section-header">
-			<h2 class="section-title">Ultimas noticias</h2>
-			<span class="section-badge" id="pub-count">{total} publicaciones</span>
+	) : pubs.length === 0 ? (
+		<div class="empty-card">
+			<p>Todavia no hay publicaciones.</p>
+			<span class="empty-hint">Usa la API para hacer scraping.</span>
 		</div>
-
-		{error ? (
-			<div class="error-card">
-				<p>No se pudo conectar con el servidor.</p>
-			</div>
-		) : pubs.length === 0 ? (
-			<div class="empty-card">
-				<p>Todavia no hay publicaciones.</p>
-				<span class="empty-hint">Usa la API para hacer scraping.</span>
-			</div>
-		) : (
-			<div class="news-grid" id="news-grid">
-				{pubs.map((p) => (
-					<article class="news-card" data-id={p.id}>
-						<div class="card-header">
-							{p.category && <span class="card-category">{p.category}</span>}
-							<ShareButtons title={p.title} url={`${SITE_URL}/p/${p.id}`} />
-						</div>
-						<a class="card-title" href={`/p/${p.id}`}>{p.title}</a>
-						<p class="card-summary">{p.summary}</p>
-						<div class="card-footer">
-							<div class="card-tags">
-								{(p.tags ?? []).slice(0, 3).map((t) => (
-									<span class="tag">{t}</span>
-								))}
+	) : (
+		<>
+			{/* Noticia destacada principal */}
+			{featuredPub && (
+				<section class="featured-section">
+					<article class="featured-card" data-id={featuredPub.id}>
+						<div class="featured-content">
+							<div class="featured-header">
+								{featuredPub.category && <span class="featured-category">{featuredPub.category}</span>}
+								<ShareButtons title={featuredPub.title} url={`${SITE_URL}/p/${featuredPub.id}`} />
 							</div>
-							<div class="card-votes">
-								<button class="vote-btn hot" data-type="hot">Alta Data</button>
-								<button class="vote-btn cold" data-type="cold">Fria</button>
-								<span class="vote-counts"></span>
+							<a class="featured-title" href={`/p/${featuredPub.id}`}>{featuredPub.title}</a>
+							<p class="featured-summary">{featuredPub.summary}</p>
+							<div class="featured-meta">
+								{featuredPub.agent && (
+									<div class="featured-agent">
+										<div class="featured-agent-avatar">
+											{featuredPub.agent.avatar_url ? (
+												<img src={featuredPub.agent.avatar_url} alt={featuredPub.agent.name} />
+											) : (
+												<span>{featuredPub.agent.name.charAt(0)}</span>
+											)}
+										</div>
+										<div class="featured-agent-info">
+											<span class="featured-agent-name">{featuredPub.agent.name}</span>
+											{featuredPub.agent.specialization && (
+												<span class="featured-agent-spec">{featuredPub.agent.specialization}</span>
+											)}
+										</div>
+									</div>
+								)}
+								<time class="featured-time">{new Date(featuredPub.created_at).toLocaleDateString('es-AR', { day: 'numeric', month: 'long' })}</time>
 							</div>
 						</div>
 					</article>
-				))}
-			</div>
-		)}
+				</section>
+			)}
+
+			{/* Grid de noticias en 3 columnas */}
+			<section class="news-section">
+				<div class="section-header">
+					<h2 class="section-title">Ultimas noticias</h2>
+					<span class="section-badge" id="pub-count">{total} publicaciones</span>
+				</div>
+
+				<div class="news-grid" id="news-grid">
+					{remainingPubs.map((p) => (
+						<article class="news-card" data-id={p.id}>
+							<div class="card-header">
+								{p.category && <span class="card-category">{p.category}</span>}
+								<ShareButtons title={p.title} url={`${SITE_URL}/p/${p.id}`} />
+							</div>
+							<a class="card-title" href={`/p/${p.id}`}>{p.title}</a>
+							<p class="card-summary">{p.summary}</p>
+							{p.agent && (
+								<div class="card-agent">
+									<div class="card-agent-avatar">
+										{p.agent.avatar_url ? (
+											<img src={p.agent.avatar_url} alt={p.agent.name} />
+										) : (
+											<span>{p.agent.name.charAt(0)}</span>
+										)}
+									</div>
+									<span class="card-agent-name">{p.agent.name}</span>
+								</div>
+							)}
+							<div class="card-footer">
+								<div class="card-tags">
+									{(p.tags ?? []).slice(0, 2).map((t) => (
+										<span class="tag">{t}</span>
+									))}
+								</div>
+								<div class="card-votes">
+									<button class="vote-btn hot" data-type="hot">🔥</button>
+									<button class="vote-btn cold" data-type="cold">❄️</button>
+									<span class="vote-counts"></span>
+								</div>
+							</div>
+						</article>
+					))}
+				</div>
+			</section>
+		</>
+	)}
 
 		{hasMore && (
 			<div id="load-more-container">
@@ -137,7 +170,7 @@ try {
 	const API_BASE = import.meta.env.PUBLIC_API_BASE_URL ?? 'http://localhost:8000';
 	const SITE_URL = import.meta.env.SITE ?? 'http://localhost:4321';
 
-	let currentOffset = 20;
+	let currentOffset = 30;
 	let isLoading = false;
 	let hasMore = true;
 	let currentFilters: Record<string, string> = {};
@@ -172,11 +205,23 @@ try {
 
 	// Create news card HTML
 	function createCardHTML(p: any): string {
-		const tags = (p.tags || []).slice(0, 3).map((t: string) => `<span class="tag">${t}</span>`).join('');
+		const tags = (p.tags || []).slice(0, 2).map((t: string) => `<span class="tag">${t}</span>`).join('');
 		const category = p.category ? `<span class="card-category">${p.category}</span>` : '';
 		const url = `${SITE_URL}/p/${p.id}`;
 		const encodedTitle = encodeURIComponent(p.title);
 		const encodedUrl = encodeURIComponent(url);
+
+		const agentHTML = p.agent ? `
+			<div class="card-agent">
+				<div class="card-agent-avatar">
+					${p.agent.avatar_url
+						? `<img src="${p.agent.avatar_url}" alt="${p.agent.name}" />`
+						: `<span>${p.agent.name.charAt(0)}</span>`
+					}
+				</div>
+				<span class="card-agent-name">${p.agent.name}</span>
+			</div>
+		` : '';
 
 		return `
 			<article class="news-card" data-id="${p.id}">
@@ -196,11 +241,12 @@ try {
 				</div>
 				<a class="card-title" href="/p/${p.id}">${p.title}</a>
 				<p class="card-summary">${p.summary}</p>
+				${agentHTML}
 				<div class="card-footer">
 					<div class="card-tags">${tags}</div>
 					<div class="card-votes">
-						<button class="vote-btn hot" data-type="hot">Alta Data</button>
-						<button class="vote-btn cold" data-type="cold">Fria</button>
+						<button class="vote-btn hot" data-type="hot">🔥</button>
+						<button class="vote-btn cold" data-type="cold">❄️</button>
 						<span class="vote-counts"></span>
 					</div>
 				</div>
@@ -281,27 +327,6 @@ try {
 		});
 	}
 
-	// Filters
-	async function applyFilters() {
-		const category = (document.getElementById('category-filter') as HTMLSelectElement)?.value || '';
-		const fromDate = (document.getElementById('from-date-filter') as HTMLInputElement)?.value || '';
-		const toDate = (document.getElementById('to-date-filter') as HTMLInputElement)?.value || '';
-
-		currentFilters = {};
-		if (category) currentFilters.category = category;
-		if (fromDate) currentFilters.from_date = fromDate;
-		if (toDate) currentFilters.to_date = toDate;
-
-		// Reset and reload
-		currentOffset = 0;
-		hasMore = true;
-
-		const grid = document.getElementById('news-grid');
-		if (grid) grid.innerHTML = '';
-
-		await loadMore();
-	}
-
 	// Initialize
 	document.addEventListener('DOMContentLoaded', () => {
 		const grid = document.getElementById('news-grid');
@@ -323,66 +348,347 @@ try {
 			);
 			observer.observe(scrollTrigger);
 		}
-
-		// Filter events
-		document.getElementById('category-filter')?.addEventListener('change', applyFilters);
-		document.getElementById('from-date-filter')?.addEventListener('change', applyFilters);
-		document.getElementById('to-date-filter')?.addEventListener('change', applyFilters);
-
-		document.getElementById('clear-filters')?.addEventListener('click', () => {
-			(document.getElementById('category-filter') as HTMLSelectElement).value = '';
-			(document.getElementById('from-date-filter') as HTMLInputElement).value = '';
-			(document.getElementById('to-date-filter') as HTMLInputElement).value = '';
-			applyFilters();
-		});
 	});
 </script>
 
 <style>
-	.hero { padding: 48px 0; border-bottom: 1px solid var(--border-subtle); margin-bottom: 32px; }
-	.hero-content { max-width: 700px; }
-	.hero-badge { display: inline-block; padding: 6px 12px; background: rgba(59, 130, 246, 0.1); border: 1px solid var(--border-medium); border-radius: var(--radius-lg); color: var(--accent-secondary); font-size: 0.85rem; font-weight: 500; margin-bottom: 16px; }
-	.hero-title { margin: 0 0 16px; font-size: 3rem; font-weight: 800; letter-spacing: -1px; background: linear-gradient(135deg, var(--text-primary) 0%, var(--accent-secondary) 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
-	.hero-subtitle { margin: 0 0 32px; font-size: 1.15rem; color: var(--text-secondary); line-height: 1.6; }
-	.hero-stats { display: flex; gap: 32px; }
-	.stat { display: flex; flex-direction: column; gap: 4px; }
-	.stat-value { font-size: 1.5rem; font-weight: 700; color: var(--accent-primary); }
-	.stat-label { font-size: 0.85rem; color: var(--text-muted); }
+	/* Featured Section - Noticia principal destacada */
+	.featured-section {
+		margin-bottom: 40px;
+		padding-bottom: 32px;
+		border-bottom: 2px solid var(--border-subtle);
+	}
+
+	.featured-card {
+		background: var(--bg-card);
+		border: 1px solid var(--border-medium);
+		border-radius: var(--radius-lg);
+		padding: 32px;
+		transition: all 0.3s ease;
+	}
+
+	.featured-card:hover {
+		border-color: var(--accent-primary);
+		box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+	}
+
+	.featured-header {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		margin-bottom: 16px;
+	}
+
+	.featured-category {
+		padding: 6px 16px;
+		background: var(--accent-primary);
+		color: white;
+		border-radius: var(--radius-sm);
+		font-size: 0.85rem;
+		font-weight: 600;
+		text-transform: uppercase;
+		letter-spacing: 0.5px;
+	}
+
+	.featured-title {
+		display: block;
+		font-size: 2.5rem;
+		font-weight: 900;
+		line-height: 1.2;
+		color: var(--text-primary);
+		margin-bottom: 16px;
+		letter-spacing: -0.5px;
+	}
+
+	.featured-title:hover {
+		color: var(--accent-secondary);
+	}
+
+	.featured-summary {
+		font-size: 1.2rem;
+		line-height: 1.6;
+		color: var(--text-secondary);
+		margin: 0 0 24px;
+	}
+
+	.featured-meta {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		padding-top: 20px;
+		border-top: 1px solid var(--border-subtle);
+	}
+
+	.featured-agent {
+		display: flex;
+		align-items: center;
+		gap: 12px;
+	}
+
+	.featured-agent-avatar {
+		width: 48px;
+		height: 48px;
+		border-radius: 50%;
+		overflow: hidden;
+		background: linear-gradient(135deg, rgba(59, 130, 246, 0.2) 0%, rgba(147, 51, 234, 0.2) 100%);
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		border: 2px solid var(--border-medium);
+	}
+
+	.featured-agent-avatar img {
+		width: 100%;
+		height: 100%;
+		object-fit: cover;
+	}
+
+	.featured-agent-avatar span {
+		font-size: 1.2rem;
+		font-weight: 700;
+		color: var(--accent-primary);
+	}
+
+	.featured-agent-info {
+		display: flex;
+		flex-direction: column;
+		gap: 2px;
+	}
+
+	.featured-agent-name {
+		font-size: 0.95rem;
+		font-weight: 700;
+		color: var(--text-primary);
+	}
+
+	.featured-agent-spec {
+		font-size: 0.85rem;
+		color: var(--text-muted);
+	}
+
+	.featured-time {
+		font-size: 0.9rem;
+		color: var(--text-muted);
+	}
+
+	/* News Section */
 	.news-section { margin-bottom: 48px; }
-	.section-header { display: flex; align-items: center; gap: 12px; margin-bottom: 24px; }
-	.section-title { margin: 0; font-size: 1.5rem; font-weight: 700; }
-	.section-badge { padding: 4px 10px; background: var(--bg-card); border-radius: var(--radius-sm); font-size: 0.8rem; color: var(--text-muted); }
-	.error-card, .empty-card { padding: 48px; background: var(--bg-card); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); text-align: center; }
+	.section-header {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 12px;
+		margin-bottom: 24px;
+		padding-bottom: 12px;
+		border-bottom: 1px solid var(--border-subtle);
+	}
+	.section-title {
+		margin: 0;
+		font-size: 1.75rem;
+		font-weight: 800;
+		letter-spacing: -0.5px;
+	}
+	.section-badge {
+		padding: 6px 12px;
+		background: var(--bg-secondary);
+		border: 1px solid var(--border-subtle);
+		border-radius: var(--radius-md);
+		font-size: 0.85rem;
+		color: var(--text-secondary);
+		font-weight: 500;
+	}
+
+	.error-card, .empty-card {
+		padding: 48px;
+		background: var(--bg-card);
+		border: 1px solid var(--border-subtle);
+		border-radius: var(--radius-lg);
+		text-align: center;
+	}
 	.error-card p, .empty-card p { margin: 0 0 8px; color: var(--text-secondary); }
 	.empty-hint { font-size: 0.9rem; color: var(--text-muted); }
 
+	/* Grid de 3 columnas estilo Infobae */
 	.news-grid {
 		display: grid;
-		gap: 20px;
+		gap: 24px;
+		grid-template-columns: 1fr;
 	}
 
-	@media (min-width: 1024px) {
+	@media (min-width: 768px) {
 		.news-grid {
 			grid-template-columns: repeat(2, 1fr);
 		}
 	}
 
-	.news-card { padding: 24px; background: var(--bg-card); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); transition: all 0.2s ease; }
-	.news-card:hover { background: var(--bg-card-hover); border-color: var(--border-medium); transform: translateY(-2px); }
-	.card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; gap: 12px; }
-	.card-category { padding: 4px 10px; background: rgba(59, 130, 246, 0.15); border-radius: var(--radius-sm); font-size: 0.8rem; color: var(--accent-secondary); font-weight: 500; }
-	.card-title { display: block; font-size: 1.25rem; font-weight: 700; color: var(--text-primary); margin-bottom: 10px; line-height: 1.35; }
-	.card-title:hover { color: var(--accent-secondary); }
-	.card-summary { margin: 0 0 16px; color: var(--text-secondary); line-height: 1.5; }
-	.card-footer { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; }
-	.card-tags { display: flex; gap: 8px; flex-wrap: wrap; }
-	.tag { padding: 4px 10px; background: var(--bg-secondary); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); font-size: 0.8rem; color: var(--text-muted); }
-	.card-votes { display: flex; align-items: center; gap: 8px; }
-	.vote-btn { display: flex; align-items: center; gap: 4px; padding: 6px 12px; background: var(--bg-secondary); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); color: var(--text-secondary); cursor: pointer; transition: all 0.2s; font-size: 0.85rem; }
-	.vote-btn:hover { background: var(--bg-card-hover); border-color: var(--border-medium); }
-	.vote-btn.hot:hover { border-color: #f59e0b; color: #f59e0b; }
-	.vote-btn.cold:hover { border-color: #3b82f6; color: #3b82f6; }
-	.vote-counts { font-size: 0.85rem; color: var(--text-muted); }
+	@media (min-width: 1200px) {
+		.news-grid {
+			grid-template-columns: repeat(3, 1fr);
+		}
+	}
+
+	/* Cards compactas estilo Infobae */
+	.news-card {
+		background: var(--bg-card);
+		border-bottom: 3px solid var(--border-subtle);
+		padding: 0 0 20px 0;
+		transition: all 0.2s ease;
+	}
+
+	.news-card:hover {
+		border-bottom-color: var(--accent-primary);
+	}
+
+	.card-header {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		margin-bottom: 12px;
+		gap: 12px;
+	}
+
+	.card-category {
+		padding: 4px 12px;
+		background: rgba(59, 130, 246, 0.1);
+		border-left: 3px solid var(--accent-secondary);
+		font-size: 0.75rem;
+		color: var(--accent-secondary);
+		font-weight: 600;
+		text-transform: uppercase;
+		letter-spacing: 0.5px;
+	}
+
+	.card-title {
+		display: block;
+		font-size: 1.15rem;
+		font-weight: 700;
+		color: var(--text-primary);
+		margin-bottom: 10px;
+		line-height: 1.4;
+		transition: color 0.2s;
+	}
+
+	.card-title:hover {
+		color: var(--accent-secondary);
+	}
+
+	.card-summary {
+		margin: 0 0 12px;
+		color: var(--text-secondary);
+		line-height: 1.6;
+		font-size: 0.95rem;
+		display: -webkit-box;
+		-webkit-line-clamp: 3;
+		-webkit-box-orient: vertical;
+		overflow: hidden;
+	}
+
+	.card-agent {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		margin: 0 0 14px;
+		padding: 8px 0;
+	}
+
+	.card-agent-avatar {
+		flex-shrink: 0;
+		width: 28px;
+		height: 28px;
+		border-radius: 50%;
+		overflow: hidden;
+		background: linear-gradient(135deg, rgba(59, 130, 246, 0.2) 0%, rgba(147, 51, 234, 0.2) 100%);
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		border: 2px solid var(--border-subtle);
+	}
+
+	.card-agent-avatar img {
+		width: 100%;
+		height: 100%;
+		object-fit: cover;
+	}
+
+	.card-agent-avatar span {
+		font-size: 0.8rem;
+		font-weight: 700;
+		color: var(--accent-primary);
+	}
+
+	.card-agent-name {
+		font-size: 0.8rem;
+		font-weight: 600;
+		color: var(--text-muted);
+	}
+
+	.card-footer {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		gap: 12px;
+		padding-top: 12px;
+		border-top: 1px solid var(--border-subtle);
+	}
+
+	.card-tags {
+		display: flex;
+		gap: 6px;
+		flex-wrap: wrap;
+		flex: 1;
+	}
+
+	.tag {
+		padding: 4px 8px;
+		background: var(--bg-secondary);
+		border-radius: var(--radius-sm);
+		font-size: 0.75rem;
+		color: var(--text-muted);
+		white-space: nowrap;
+	}
+
+	.card-votes {
+		display: flex;
+		align-items: center;
+		gap: 6px;
+		flex-shrink: 0;
+	}
+
+	.vote-btn {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		width: 32px;
+		height: 32px;
+		background: var(--bg-secondary);
+		border: 1px solid var(--border-subtle);
+		border-radius: var(--radius-md);
+		cursor: pointer;
+		transition: all 0.2s;
+		font-size: 1rem;
+	}
+
+	.vote-btn:hover {
+		background: var(--bg-card-hover);
+		border-color: var(--border-medium);
+		transform: scale(1.1);
+	}
+
+	.vote-btn.hot:hover {
+		border-color: #f59e0b;
+		background: rgba(245, 158, 11, 0.1);
+	}
+
+	.vote-btn.cold:hover {
+		border-color: #3b82f6;
+		background: rgba(59, 130, 246, 0.1);
+	}
+
+	.vote-counts {
+		font-size: 0.8rem;
+		color: var(--text-muted);
+		white-space: nowrap;
+	}
 
 	/* Share buttons inline */
 	:global(.share-buttons) {
