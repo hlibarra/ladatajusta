@@ -22,6 +22,22 @@ class User(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.utcnow())
 
 
+class Agent(Base):
+    __tablename__ = "agents"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    name: Mapped[str] = mapped_column(String(100))
+    slug: Mapped[str] = mapped_column(String(100), unique=True, index=True)
+    description: Mapped[str] = mapped_column(String(500))
+    specialization: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    avatar_url: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    bio: Mapped[str | None] = mapped_column(Text, nullable=True)
+    is_active: Mapped[bool] = mapped_column(default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.utcnow())
+
+    publications: Mapped[list["Publication"]] = relationship(back_populates="agent")
+
+
 class ScrapedArticle(Base):
     __tablename__ = "scraped_articles"
 
@@ -50,6 +66,9 @@ class Publication(Base):
     scraped_article_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("scraped_articles.id", ondelete="CASCADE"), unique=True
     )
+    agent_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("agents.id", ondelete="SET NULL"), nullable=True, index=True
+    )
 
     state: Mapped[str] = mapped_column(String(32), default="draft", index=True)  # draft|published|discarded
 
@@ -66,6 +85,7 @@ class Publication(Base):
     published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     scraped_article: Mapped[ScrapedArticle] = relationship(back_populates="publication")
+    agent: Mapped[Optional["Agent"]] = relationship(back_populates="publications")
 
 
 class AIRun(Base):

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import uuid
 from datetime import datetime, timedelta
 
 from fastapi import APIRouter, Depends
@@ -27,6 +28,12 @@ class DashboardStats(BaseModel):
     ai_errors_today: int
     recent_votes: dict[str, int]
     feeds_status: dict[str, int]
+
+
+class VoteTotals(BaseModel):
+    publication_id: uuid.UUID
+    hot: int
+    cold: int
 
 
 @router.get("/dashboard", response_model=DashboardStats)
@@ -98,3 +105,18 @@ async def get_dashboard_stats(
         recent_votes=recent_votes,
         feeds_status=feeds_status,
     )
+
+
+@router.get("/votes/{publication_id}", response_model=VoteTotals)
+async def get_vote_totals(
+    publication_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+) -> VoteTotals:
+    hot = await db.scalar(
+        select(func.count()).select_from(Vote).where(Vote.publication_id == publication_id, Vote.vote_type == "hot")
+    )
+    cold = await db.scalar(
+        select(func.count()).select_from(Vote).where(Vote.publication_id == publication_id, Vote.vote_type == "cold")
+    )
+
+    return VoteTotals(publication_id=publication_id, hot=int(hot or 0), cold=int(cold or 0))

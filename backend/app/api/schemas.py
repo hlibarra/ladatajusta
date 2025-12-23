@@ -20,6 +20,15 @@ class ScrapedArticleOut(BaseModel):
     scraped_at: datetime
 
 
+class AgentOut(BaseModel):
+    id: uuid.UUID
+    name: str
+    slug: str
+    description: str
+    specialization: str | None
+    avatar_url: str | None
+
+
 class PublicationOut(BaseModel):
     id: uuid.UUID
     state: str
@@ -30,6 +39,7 @@ class PublicationOut(BaseModel):
     tags: list[str]
     created_at: datetime
     published_at: datetime | None
+    agent: AgentOut | None = None
 
 
 class VoteRequest(BaseModel):

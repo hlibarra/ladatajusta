@@ -8,10 +8,12 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
 from sqlalchemy import and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.ai.pipeline import process_article
 from app.api.deps import CurrentAdmin
 from app.api.schemas import (
+    AgentOut,
     PaginatedPublications,
     PublicationOut,
     PublicationUpdate,
@@ -19,10 +21,37 @@ from app.api.schemas import (
     VoteRequest,
     VoteTotalsOut,
 )
-from app.db.models import AIRun, Publication, ScrapedArticle, Vote
+from app.db.models import Agent, AIRun, Publication, ScrapedArticle, Vote
 from app.db.session import get_db
 
 router = APIRouter()
+
+
+def _to_publication_out(pub: Publication) -> PublicationOut:
+    """Convert Publication model to PublicationOut schema"""
+    agent_out = None
+    if pub.agent:
+        agent_out = AgentOut(
+            id=pub.agent.id,
+            name=pub.agent.name,
+            slug=pub.agent.slug,
+            description=pub.agent.description,
+            specialization=pub.agent.specialization,
+            avatar_url=pub.agent.avatar_url,
+        )
+
+    return PublicationOut(
+        id=pub.id,
+        state=pub.state,
+        title=pub.title,
+        summary=pub.summary,
+        body=pub.body,
+        category=pub.category,
+        tags=pub.tags or [],
+        created_at=pub.created_at,
+        published_at=pub.published_at,
+        agent=agent_out,
+    )
 
 
 def _voter_key(req: Request) -> str:
@@ -41,26 +70,14 @@ async def list_publications(
 ) -> list[PublicationOut]:
     q = (
         select(Publication)
+        .options(selectinload(Publication.agent))
         .where(Publication.state == state)
         .order_by(Publication.published_at.desc().nullslast(), Publication.created_at.desc())
         .limit(min(limit, 100))
         .offset(max(offset, 0))
     )
     rows = (await db.scalars(q)).all()
-    return [
-        PublicationOut(
-            id=r.id,
-            state=r.state,
-            title=r.title,
-            summary=r.summary,
-            body=r.body,
-            category=r.category,
-            tags=r.tags or [],
-            created_at=r.created_at,
-            published_at=r.published_at,
-        )
-        for r in rows
-    ]
+    return [_to_publication_out(r) for r in rows]
 
 
 @router.get("/search", response_model=PaginatedPublications)
@@ -106,6 +123,7 @@ async def search_publications(
     # Fetch items
     items_q = (
         select(Publication)
+        .options(selectinload(Publication.agent))
         .where(and_(*conditions))
         .order_by(Publication.published_at.desc().nullslast(), Publication.created_at.desc())
         .limit(limit)
@@ -113,20 +131,7 @@ async def search_publications(
     )
     rows = (await db.scalars(items_q)).all()
 
-    items = [
-        PublicationOut(
-            id=r.id,
-            state=r.state,
-            title=r.title,
-            summary=r.summary,
-            body=r.body,
-            category=r.category,
-            tags=r.tags or [],
-            created_at=r.created_at,
-            published_at=r.published_at,
-        )
-        for r in rows
-    ]
+    items = [_to_publication_out(r) for r in rows]
 
     return PaginatedPublications(
         items=items,
@@ -139,20 +144,11 @@ async def search_publications(
 
 @router.get("/{publication_id}", response_model=PublicationOut)
 async def get_publication(publication_id: uuid.UUID, db: AsyncSession = Depends(get_db)) -> PublicationOut:
-    pub = await db.get(Publication, publication_id)
+    q = select(Publication).options(selectinload(Publication.agent)).where(Publication.id == publication_id)
+    pub = await db.scalar(q)
     if not pub:
         raise HTTPException(status_code=404, detail="No existe")
-    return PublicationOut(
-        id=pub.id,
-        state=pub.state,
-        title=pub.title,
-        summary=pub.summary,
-        body=pub.body,
-        category=pub.category,
-        tags=pub.tags or [],
-        created_at=pub.created_at,
-        published_at=pub.published_at,
-    )
+    return _to_publication_out(pub)
 
 
 @router.post("/process/{scraped_id}", response_model=PublicationOut)
@@ -162,19 +158,13 @@ async def process_scraped(scraped_id: uuid.UUID, db: AsyncSession = Depends(get_
         raise HTTPException(status_code=404, detail="ScrapedArticle no existe")
 
     # if already processed
-    existing_pub = await db.scalar(select(Publication).where(Publication.scraped_article_id == scraped_id))
+    existing_pub = await db.scalar(
+        select(Publication)
+        .options(selectinload(Publication.agent))
+        .where(Publication.scraped_article_id == scraped_id)
+    )
     if existing_pub:
-        return PublicationOut(
-            id=existing_pub.id,
-            state=existing_pub.state,
-            title=existing_pub.title,
-            summary=existing_pub.summary,
-            body=existing_pub.body,
-            category=existing_pub.category,
-            tags=existing_pub.tags or [],
-            created_at=existing_pub.created_at,
-            published_at=existing_pub.published_at,
-        )
+        return _to_publication_out(existing_pub)
 
     processed = await process_article(article.extracted_text, title_hint=article.title)
 
@@ -205,22 +195,17 @@ async def process_scraped(scraped_id: uuid.UUID, db: AsyncSession = Depends(get_
     await db.commit()
     await db.refresh(pub)
 
-    return PublicationOut(
-        id=pub.id,
-        state=pub.state,
-        title=pub.title,
-        summary=pub.summary,
-        body=pub.body,
-        category=pub.category,
-        tags=pub.tags or [],
-        created_at=pub.created_at,
-        published_at=pub.published_at,
-    )
+    # Reload with agent relationship
+    q = select(Publication).options(selectinload(Publication.agent)).where(Publication.id == pub.id)
+    pub = await db.scalar(q)
+
+    return _to_publication_out(pub)
 
 
 @router.post("/{publication_id}/publish", response_model=PublicationOut)
 async def publish_publication(publication_id: uuid.UUID, db: AsyncSession = Depends(get_db)) -> PublicationOut:
-    pub = await db.get(Publication, publication_id)
+    q = select(Publication).options(selectinload(Publication.agent)).where(Publication.id == publication_id)
+    pub = await db.scalar(q)
     if not pub:
         raise HTTPException(status_code=404, detail="No existe")
 
@@ -229,17 +214,7 @@ async def publish_publication(publication_id: uuid.UUID, db: AsyncSession = Depe
     await db.commit()
     await db.refresh(pub)
 
-    return PublicationOut(
-        id=pub.id,
-        state=pub.state,
-        title=pub.title,
-        summary=pub.summary,
-        body=pub.body,
-        category=pub.category,
-        tags=pub.tags or [],
-        created_at=pub.created_at,
-        published_at=pub.published_at,
-    )
+    return _to_publication_out(pub)
 
 
 @router.post("/{publication_id}/vote", response_model=VoteTotalsOut)
@@ -281,7 +256,8 @@ async def update_publication(
     admin: CurrentAdmin,
     db: AsyncSession = Depends(get_db),
 ) -> PublicationOut:
-    pub = await db.get(Publication, publication_id)
+    q = select(Publication).options(selectinload(Publication.agent)).where(Publication.id == publication_id)
+    pub = await db.scalar(q)
     if not pub:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No existe")
 
@@ -299,17 +275,7 @@ async def update_publication(
     await db.commit()
     await db.refresh(pub)
 
-    return PublicationOut(
-        id=pub.id,
-        state=pub.state,
-        title=pub.title,
-        summary=pub.summary,
-        body=pub.body,
-        category=pub.category,
-        tags=pub.tags or [],
-        created_at=pub.created_at,
-        published_at=pub.published_at,
-    )
+    return _to_publication_out(pub)
 
 
 @router.delete("/{publication_id}")
@@ -334,7 +300,8 @@ async def change_state(
     admin: CurrentAdmin,
     db: AsyncSession = Depends(get_db),
 ) -> PublicationOut:
-    pub = await db.get(Publication, publication_id)
+    q = select(Publication).options(selectinload(Publication.agent)).where(Publication.id == publication_id)
+    pub = await db.scalar(q)
     if not pub:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No existe")
 
@@ -345,17 +312,7 @@ async def change_state(
     await db.commit()
     await db.refresh(pub)
 
-    return PublicationOut(
-        id=pub.id,
-        state=pub.state,
-        title=pub.title,
-        summary=pub.summary,
-        body=pub.body,
-        category=pub.category,
-        tags=pub.tags or [],
-        created_at=pub.created_at,
-        published_at=pub.published_at,
-    )
+    return _to_publication_out(pub)
 
 
 @router.post("/{publication_id}/restore", response_model=PublicationOut)
@@ -364,7 +321,8 @@ async def restore_publication(
     admin: CurrentAdmin,
     db: AsyncSession = Depends(get_db),
 ) -> PublicationOut:
-    pub = await db.get(Publication, publication_id)
+    q = select(Publication).options(selectinload(Publication.agent)).where(Publication.id == publication_id)
+    pub = await db.scalar(q)
     if not pub:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No existe")
 
@@ -378,14 +336,4 @@ async def restore_publication(
     await db.commit()
     await db.refresh(pub)
 
-    return PublicationOut(
-        id=pub.id,
-        state=pub.state,
-        title=pub.title,
-        summary=pub.summary,
-        body=pub.body,
-        category=pub.category,
-        tags=pub.tags or [],
-        created_at=pub.created_at,
-        published_at=pub.published_at,
-    )
+    return _to_publication_out(pub)
