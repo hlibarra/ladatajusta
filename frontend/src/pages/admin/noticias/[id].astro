@@ -44,6 +44,31 @@ const { id } = Astro.params;
             </div>
           </div>
 
+          <div class="form-section">
+            <h3 class="section-title">Niveles de Lectura</h3>
+
+            <div class="form-group">
+              <label class="form-label" for="content_sin_vueltas">Sin Vueltas (Ultra corto)</label>
+              <textarea id="content_sin_vueltas" name="content_sin_vueltas" class="form-textarea" rows="2" placeholder="Version ultra corta de la noticia"></textarea>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="content_lo_central">Lo Central (Esencial)</label>
+              <textarea id="content_lo_central" name="content_lo_central" class="form-textarea" rows="4" placeholder="Version esencial de la noticia"></textarea>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="content_en_profundidad">En Profundidad (Completo)</label>
+              <textarea id="content_en_profundidad" name="content_en_profundidad" class="form-textarea" rows="8" placeholder="Version completa con contexto"></textarea>
+            </div>
+          </div>
+
+          <div class="form-section">
+            <h3 class="section-title">Multimedia</h3>
+            <div id="media-list"></div>
+            <button type="button" class="btn btn-secondary" id="add-media-btn">+ Agregar Imagen/Video</button>
+          </div>
+
           <div class="form-actions">
             <button type="submit" class="btn btn-primary">Guardar cambios</button>
           </div>
@@ -108,6 +133,14 @@ const { id } = Astro.params;
     (document.getElementById('body') as HTMLTextAreaElement).value = publication.body;
     (document.getElementById('category') as HTMLInputElement).value = publication.category || '';
     (document.getElementById('tags') as HTMLInputElement).value = (publication.tags || []).join(', ');
+
+    // Reading levels
+    (document.getElementById('content_sin_vueltas') as HTMLTextAreaElement).value = publication.content_sin_vueltas || '';
+    (document.getElementById('content_lo_central') as HTMLTextAreaElement).value = publication.content_lo_central || '';
+    (document.getElementById('content_en_profundidad') as HTMLTextAreaElement).value = publication.content_en_profundidad || '';
+
+    // Media
+    renderMediaList();
   }
 
   function updatePreview() {
@@ -196,6 +229,70 @@ const { id } = Astro.params;
     }
   }
 
+  // Media handling
+  function renderMediaList() {
+    const mediaList = document.getElementById('media-list')!;
+    const media = publication.media || [];
+
+    if (media.length === 0) {
+      mediaList.innerHTML = '<p class="text-muted">No hay multimedia agregada</p>';
+      return;
+    }
+
+    mediaList.innerHTML = media.map((item: any, index: number) => `
+      <div class="media-item" data-index="${index}">
+        <div class="media-preview">
+          ${item.type === 'image'
+            ? `<img src="${item.url}" alt="${item.caption || ''}" />`
+            : `<div class="video-icon">🎥 Video</div>`}
+        </div>
+        <div class="media-info">
+          <div><strong>${item.type === 'image' ? 'Imagen' : 'Video'}</strong></div>
+          <div class="media-url">${item.url}</div>
+          ${item.caption ? `<div class="media-caption">${item.caption}</div>` : ''}
+        </div>
+        <button type="button" class="btn-remove" data-index="${index}">×</button>
+      </div>
+    `).join('');
+
+    // Add remove handlers
+    mediaList.querySelectorAll('.btn-remove').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const index = parseInt((e.target as HTMLElement).getAttribute('data-index')!);
+        removeMedia(index);
+      });
+    });
+  }
+
+  function addMedia() {
+    const type = prompt('Tipo de media (image o video):');
+    if (!type || (type !== 'image' && type !== 'video')) return;
+
+    const url = prompt('URL:');
+    if (!url) return;
+
+    const caption = prompt('Caption (opcional):') || '';
+
+    if (!publication.media) publication.media = [];
+    publication.media.push({
+      type,
+      url,
+      caption,
+      order: publication.media.length
+    });
+
+    renderMediaList();
+  }
+
+  function removeMedia(index: number) {
+    if (confirm('¿Eliminar este elemento multimedia?')) {
+      publication.media.splice(index, 1);
+      // Reorder
+      publication.media.forEach((item: any, i: number) => item.order = i);
+      renderMediaList();
+    }
+  }
+
   // Form submit
   document.getElementById('edit-form')?.addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -207,10 +304,25 @@ const { id } = Astro.params;
     const tagsStr = (document.getElementById('tags') as HTMLInputElement).value;
     const tags = tagsStr.split(',').map(t => t.trim()).filter(t => t);
 
+    // Reading levels
+    const content_sin_vueltas = (document.getElementById('content_sin_vueltas') as HTMLTextAreaElement).value;
+    const content_lo_central = (document.getElementById('content_lo_central') as HTMLTextAreaElement).value;
+    const content_en_profundidad = (document.getElementById('content_en_profundidad') as HTMLTextAreaElement).value;
+
     try {
       const r = await authFetch(`/api/publications/${publicationId}`, {
         method: 'PUT',
-        body: JSON.stringify({ title, summary, body, category, tags }),
+        body: JSON.stringify({
+          title,
+          summary,
+          body,
+          category,
+          tags,
+          content_sin_vueltas,
+          content_lo_central,
+          content_en_profundidad,
+          media: publication.media || []
+        }),
       });
 
       if (r.ok) {
@@ -224,6 +336,9 @@ const { id } = Astro.params;
       alert('Error al guardar');
     }
   });
+
+  // Add media button
+  document.getElementById('add-media-btn')?.addEventListener('click', addMedia);
 
   // Live preview
   ['title', 'summary', 'category', 'tags'].forEach(field => {
@@ -343,6 +458,98 @@ const { id } = Astro.params;
 
   .editor-sidebar .card {
     margin-bottom: 20px;
+  }
+
+  .form-section {
+    margin-top: 32px;
+    padding-top: 32px;
+    border-top: 2px solid var(--border-subtle);
+  }
+
+  .section-title {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 20px;
+  }
+
+  .media-item {
+    display: flex;
+    gap: 12px;
+    padding: 12px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    margin-bottom: 12px;
+    align-items: center;
+  }
+
+  .media-preview {
+    flex-shrink: 0;
+    width: 80px;
+    height: 60px;
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+    background: var(--bg-card);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .media-preview img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .video-icon {
+    font-size: 1.5rem;
+  }
+
+  .media-info {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .media-url {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .media-caption {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    font-style: italic;
+    margin-top: 4px;
+  }
+
+  .btn-remove {
+    flex-shrink: 0;
+    width: 32px;
+    height: 32px;
+    border: none;
+    background: var(--danger);
+    color: white;
+    border-radius: 50%;
+    cursor: pointer;
+    font-size: 1.5rem;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .btn-remove:hover {
+    background: #dc2626;
+  }
+
+  .text-muted {
+    color: var(--text-muted);
+    font-style: italic;
+    font-size: 0.9rem;
   }
 
   @media (max-width: 1024px) {

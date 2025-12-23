@@ -1,5 +1,8 @@
+// Use client-specific API URL for browser requests
 export const API_BASE =
-  import.meta.env.PUBLIC_API_BASE_URL ?? "http://localhost:8000";
+  import.meta.env.PUBLIC_CLIENT_API_BASE_URL ??
+  import.meta.env.PUBLIC_API_BASE_URL ??
+  "http://localhost:8000";
 
 // Types
 export interface Publication {

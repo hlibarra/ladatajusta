@@ -12,6 +12,13 @@ type Agent = {
 	avatar_url?: string | null;
 };
 
+type MediaItem = {
+	type: 'image' | 'video';
+	url: string;
+	caption?: string | null;
+	order: number;
+};
+
 type Publication = {
 	id: string;
 	state: string;
@@ -23,6 +30,10 @@ type Publication = {
 	created_at: string;
 	published_at?: string | null;
 	agent?: Agent | null;
+	content_sin_vueltas?: string | null;
+	content_lo_central?: string | null;
+	content_en_profundidad?: string | null;
+	media?: MediaItem[];
 };
 
 const { id } = Astro.params;
@@ -95,7 +106,65 @@ try {
 				</div>
 			)}
 
-			<div class="body-content">
+			{/* Media Gallery */}
+			{pub.media && pub.media.length > 0 && (
+				<div class="media-gallery">
+					{pub.media.sort((a, b) => a.order - b.order).map((item) => (
+						<div class="media-item">
+							{item.type === 'image' ? (
+								<img src={item.url} alt={item.caption || pub.title} loading="lazy" />
+							) : (
+								<div class="video-wrapper">
+									<iframe
+										src={item.url}
+										title={item.caption || pub.title}
+										frameborder="0"
+										allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+										allowfullscreen
+									></iframe>
+								</div>
+							)}
+							{item.caption && <div class="media-caption">{item.caption}</div>}
+						</div>
+					))}
+				</div>
+			)}
+
+			{/* Reading Level Selector */}
+			{(pub.content_sin_vueltas || pub.content_lo_central || pub.content_en_profundidad) && (
+				<div class="reading-level-selector">
+					<div class="level-label">Nivel de lectura:</div>
+					<div class="level-buttons">
+						{pub.content_sin_vueltas && (
+							<button class="level-btn" data-level="sin_vueltas">
+								<span class="level-name">Sin vueltas</span>
+								<span class="level-desc">Directo</span>
+							</button>
+						)}
+						{pub.content_lo_central && (
+							<button class="level-btn active" data-level="lo_central">
+								<span class="level-name">Lo central</span>
+								<span class="level-desc">Esencial</span>
+							</button>
+						)}
+						{pub.content_en_profundidad && (
+							<button class="level-btn" data-level="en_profundidad">
+								<span class="level-name">En profundidad</span>
+								<span class="level-desc">Completo</span>
+							</button>
+						)}
+					</div>
+				</div>
+			)}
+
+			{/* Hidden JSON data for reading levels */}
+			<script type="application/json" id="reading-levels-data" set:html={JSON.stringify({
+				sin_vueltas: pub.content_sin_vueltas || '',
+				lo_central: pub.content_lo_central || pub.summary,
+				en_profundidad: pub.content_en_profundidad || pub.body
+			})} />
+
+			<div class="body-content" id="article-content">
 				{pub.body.split('\n').map((paragraph) => (
 					paragraph.trim() && <p>{paragraph}</p>
 				))}
@@ -114,8 +183,86 @@ try {
 	)}
 </Layout>
 
-<script>
-	const API_BASE = import.meta.env.PUBLIC_API_BASE_URL ?? 'http://localhost:8000';
+<script is:inline>
+	const API_BASE = 'http://localhost:8000';
+
+	// Reading Level Selector Logic
+	const levelButtons = document.querySelectorAll('.level-btn');
+	const contentDiv = document.getElementById('article-content');
+
+	if (levelButtons.length > 0 && contentDiv) {
+		// Get content from JSON script tag
+		const dataScript = document.getElementById('reading-levels-data');
+		const contentData = dataScript ? JSON.parse(dataScript.textContent) : {
+			sin_vueltas: '',
+			lo_central: '',
+			en_profundidad: ''
+		};
+
+		console.log('Reading levels available:', {
+			sin_vueltas: contentData.sin_vueltas ? contentData.sin_vueltas.substring(0, 50) + '...' : 'EMPTY',
+			lo_central: contentData.lo_central ? contentData.lo_central.substring(0, 50) + '...' : 'EMPTY',
+			en_profundidad: contentData.en_profundidad ? contentData.en_profundidad.substring(0, 50) + '...' : 'EMPTY'
+		});
+
+		// Get preferred reading level from localStorage or default to 'lo_central'
+		const savedLevel = localStorage.getItem('preferred_reading_level') || 'lo_central';
+
+		// Function to render content for a specific level
+		function renderContent(level) {
+			console.log('Rendering level:', level);
+			let content = contentData[level];
+
+			if (!content || content.trim() === '') {
+				console.warn('No content for level:', level, '- using fallback');
+				content = contentData.en_profundidad || contentData.lo_central || contentData.sin_vueltas;
+			}
+
+			console.log('Content to render (first 100 chars):', content.substring(0, 100));
+
+			// Split by newlines and create paragraphs
+			const paragraphs = content.split('\n')
+				.filter(p => p.trim())
+				.map(p => `<p>${p}</p>`)
+				.join('');
+
+			contentDiv.innerHTML = paragraphs;
+			console.log('Rendered', paragraphs.split('</p>').length - 1, 'paragraphs');
+		}
+
+		// Function to update active button
+		function updateActiveButton(level) {
+			levelButtons.forEach(btn => {
+				if (btn.getAttribute('data-level') === level) {
+					btn.classList.add('active');
+				} else {
+					btn.classList.remove('active');
+				}
+			});
+		}
+
+		// Initialize with saved level if available
+		if (savedLevel && document.querySelector(`[data-level="${savedLevel}"]`)) {
+			console.log('Initializing with saved level:', savedLevel);
+			renderContent(savedLevel);
+			updateActiveButton(savedLevel);
+		}
+
+		// Add click handlers
+		levelButtons.forEach(btn => {
+			btn.addEventListener('click', () => {
+				const level = btn.getAttribute('data-level');
+				console.log('Button clicked, level:', level);
+				if (level) {
+					renderContent(level);
+					updateActiveButton(level);
+					// Save preference to localStorage
+					localStorage.setItem('preferred_reading_level', level);
+				}
+			});
+		});
+	}
+
 	const votesDiv = document.querySelector('.votes');
 
 	if (votesDiv) {
@@ -129,7 +276,7 @@ try {
 		let userVote = localStorage.getItem(storageKey);
 
 		// Function to update button states
-		function updateButtonStates(currentVote: string | null) {
+		function updateButtonStates(currentVote) {
 			hotBtn?.classList.remove('active');
 			coldBtn?.classList.remove('active');
 
@@ -290,6 +437,118 @@ try {
 
 	.tags { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 32px; }
 	.tag { padding: 6px 14px; background: var(--bg-secondary); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); font-size: 0.85rem; color: var(--text-secondary); }
+
+	/* Media Gallery */
+	.media-gallery {
+		margin: 32px 0;
+		display: flex;
+		flex-direction: column;
+		gap: 24px;
+	}
+	.media-item {
+		width: 100%;
+		border-radius: var(--radius-lg);
+		overflow: hidden;
+		background: var(--bg-card);
+		border: 1px solid var(--border-subtle);
+	}
+	.media-item img {
+		width: 100%;
+		height: auto;
+		display: block;
+		max-height: 600px;
+		object-fit: cover;
+	}
+	.video-wrapper {
+		position: relative;
+		padding-bottom: 56.25%; /* 16:9 aspect ratio */
+		height: 0;
+		overflow: hidden;
+	}
+	.video-wrapper iframe {
+		position: absolute;
+		top: 0;
+		left: 0;
+		width: 100%;
+		height: 100%;
+	}
+	.media-caption {
+		padding: 12px 16px;
+		font-size: 0.9rem;
+		color: var(--text-muted);
+		font-style: italic;
+		background: var(--bg-secondary);
+		border-top: 1px solid var(--border-subtle);
+	}
+
+	/* Reading Level Selector */
+	.reading-level-selector {
+		margin-bottom: 32px;
+		padding: 20px;
+		background: var(--bg-card);
+		border: 1px solid var(--border-subtle);
+		border-radius: var(--radius-md);
+	}
+
+	.level-label {
+		font-size: 0.85rem;
+		font-weight: 600;
+		color: var(--text-muted);
+		text-transform: uppercase;
+		letter-spacing: 0.5px;
+		margin-bottom: 12px;
+	}
+
+	.level-buttons {
+		display: flex;
+		gap: 12px;
+		flex-wrap: wrap;
+	}
+
+	.level-btn {
+		display: flex;
+		flex-direction: column;
+		align-items: flex-start;
+		padding: 12px 16px;
+		background: var(--bg-secondary);
+		border: 2px solid var(--border-subtle);
+		border-radius: var(--radius-md);
+		cursor: pointer;
+		transition: all 0.2s;
+		min-width: 140px;
+	}
+
+	.level-btn:hover {
+		border-color: var(--accent-primary);
+		background: var(--bg-card-hover);
+		transform: translateY(-2px);
+		box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+	}
+
+	.level-btn.active {
+		border-color: var(--accent-primary);
+		background: rgba(59, 130, 246, 0.1);
+	}
+
+	.level-name {
+		font-size: 0.95rem;
+		font-weight: 700;
+		color: var(--text-primary);
+		margin-bottom: 2px;
+	}
+
+	.level-desc {
+		font-size: 0.75rem;
+		color: var(--text-muted);
+	}
+
+	.level-btn.active .level-name {
+		color: var(--accent-primary);
+	}
+
+	.level-btn.active .level-desc {
+		color: var(--accent-secondary);
+	}
 
 	.body-content { margin-bottom: 40px; }
 	.body-content p { margin: 0 0 16px; line-height: 1.8; color: var(--text-primary); font-size: 1.05rem; }
