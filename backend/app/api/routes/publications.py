@@ -14,6 +14,7 @@ from app.ai.pipeline import process_article
 from app.api.deps import CurrentAdmin
 from app.api.schemas import (
     AgentOut,
+    MediaItem,
     PaginatedPublications,
     PublicationOut,
     PublicationUpdate,
@@ -51,6 +52,10 @@ def _to_publication_out(pub: Publication) -> PublicationOut:
         created_at=pub.created_at,
         published_at=pub.published_at,
         agent=agent_out,
+        content_sin_vueltas=pub.content_sin_vueltas,
+        content_lo_central=pub.content_lo_central,
+        content_en_profundidad=pub.content_en_profundidad,
+        media=pub.media or [],
     )
 
 
@@ -271,6 +276,14 @@ async def update_publication(
         pub.category = payload.category
     if payload.tags is not None:
         pub.tags = payload.tags
+    if payload.content_sin_vueltas is not None:
+        pub.content_sin_vueltas = payload.content_sin_vueltas
+    if payload.content_lo_central is not None:
+        pub.content_lo_central = payload.content_lo_central
+    if payload.content_en_profundidad is not None:
+        pub.content_en_profundidad = payload.content_en_profundidad
+    if payload.media is not None:
+        pub.media = [item.model_dump() for item in payload.media]
 
     await db.commit()
     await db.refresh(pub)

@@ -73,6 +73,36 @@ async def get_current_user(
     return user
 
 
+async def get_current_user_optional(
+    credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(security)],
+    db: AsyncSession = Depends(get_db),
+) -> User | None:
+    """
+    Obtiene el usuario actual si está autenticado, de lo contrario devuelve None.
+    No lanza excepciones si el usuario no está autenticado.
+    """
+    if not credentials:
+        return None
+
+    payload = decode_token(credentials.credentials)
+    if not payload or payload.get("type") != "access":
+        return None
+
+    user_id = payload.get("sub")
+    if not user_id:
+        return None
+
+    try:
+        user = await db.get(User, uuid.UUID(user_id))
+    except ValueError:
+        return None
+
+    if not user or not user.is_active:
+        return None
+
+    return user
+
+
 async def get_current_admin(
     current_user: Annotated[User, Depends(get_current_user)],
 ) -> User:

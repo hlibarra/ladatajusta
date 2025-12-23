@@ -5,7 +5,7 @@ from datetime import datetime
 
 from pgvector.sqlalchemy import Vector
 from sqlalchemy import DateTime, ForeignKey, Index, String, Text, UniqueConstraint
-from sqlalchemy.dialects.postgresql import ARRAY, UUID
+from sqlalchemy.dialects.postgresql import ARRAY, JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from typing import Optional
 from app.db.base import Base
@@ -19,6 +19,7 @@ class User(Base):
     hashed_password: Mapped[str] = mapped_column(String(255))
     is_active: Mapped[bool] = mapped_column(default=True)
     is_admin: Mapped[bool] = mapped_column(default=False)
+    preferred_reading_level: Mapped[str] = mapped_column(String(32), default="lo_central")  # sin_vueltas|lo_central|en_profundidad
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.utcnow())
 
 
@@ -75,6 +76,15 @@ class Publication(Base):
     title: Mapped[str] = mapped_column(String(512))
     summary: Mapped[str] = mapped_column(Text)
     body: Mapped[str] = mapped_column(Text)
+
+    # Reading levels - Niveles de lectura
+    content_sin_vueltas: Mapped[str | None] = mapped_column(Text, nullable=True)  # Ultra corto
+    content_lo_central: Mapped[str | None] = mapped_column(Text, nullable=True)  # Esencial
+    content_en_profundidad: Mapped[str | None] = mapped_column(Text, nullable=True)  # Explicativo con contexto
+
+    # Multimedia - Images and videos
+    # Format: [{"type": "image|video", "url": "...", "caption": "...", "order": 0}, ...]
+    media: Mapped[list[dict] | None] = mapped_column(JSONB, nullable=True, default=list)
 
     category: Mapped[str | None] = mapped_column(String(80), nullable=True)
     tags: Mapped[list[str]] = mapped_column(ARRAY(String(64)), default=list)
