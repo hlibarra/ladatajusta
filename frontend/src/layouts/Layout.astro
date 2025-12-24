@@ -34,7 +34,7 @@ const { title = 'La Data Justa' } = Astro.props;
 					<a class="logo" href="/">
 						<span class="logo-text">La Data Justa</span>
 					</a>
-					<nav class="nav">
+					<nav class="nav" id="nav-menu">
 						<a href="/" class="nav-link active">Inicio</a>
 						<a href="/tendencias" class="nav-link">Tendencias</a>
 					</nav>
@@ -47,6 +47,11 @@ const { title = 'La Data Justa' } = Astro.props;
 							<span class="live-dot"></span>
 							24/7
 						</span>
+						<button class="menu-toggle" id="menu-toggle" aria-label="Abrir menu">
+							<span class="hamburger-line"></span>
+							<span class="hamburger-line"></span>
+							<span class="hamburger-line"></span>
+						</button>
 					</div>
 				</div>
 			</header>
@@ -74,6 +79,26 @@ const { title = 'La Data Justa' } = Astro.props;
 				var next = current === 'dark' ? 'light' : 'dark';
 				html.setAttribute('data-theme', next);
 				localStorage.setItem('theme', next);
+			});
+		}
+
+		// Mobile menu toggle
+		var menuToggle = document.getElementById('menu-toggle');
+		var navMenu = document.getElementById('nav-menu');
+		if (menuToggle && navMenu) {
+			menuToggle.addEventListener('click', function() {
+				navMenu.classList.toggle('open');
+				menuToggle.classList.toggle('open');
+				document.body.classList.toggle('menu-open');
+			});
+
+			// Close menu when clicking a link
+			navMenu.querySelectorAll('.nav-link').forEach(function(link) {
+				link.addEventListener('click', function() {
+					navMenu.classList.remove('open');
+					menuToggle.classList.remove('open');
+					document.body.classList.remove('menu-open');
+				});
 			});
 		}
 	});
@@ -168,5 +193,75 @@ const { title = 'La Data Justa' } = Astro.props;
 	.footer-brand { font-weight: 700; font-size: 1.1rem; margin-bottom: 8px; color: var(--text-primary); }
 	.footer-tagline { color: var(--text-secondary); margin: 0 0 12px; }
 	.footer-copy { color: var(--text-muted); font-size: 0.85rem; margin: 0; }
-	@media (max-width: 768px) { .header-content { padding: 0 16px; } .nav { display: none; } .main { padding: 20px 16px; } }
+	/* Mobile menu toggle button */
+	.menu-toggle {
+		display: none;
+		flex-direction: column;
+		justify-content: center;
+		align-items: center;
+		width: 40px;
+		height: 40px;
+		background: transparent;
+		border: none;
+		cursor: pointer;
+		padding: 8px;
+		gap: 5px;
+	}
+	.hamburger-line {
+		width: 24px;
+		height: 2px;
+		background: var(--text-primary);
+		transition: all 0.3s ease;
+		border-radius: 2px;
+	}
+	.menu-toggle.open .hamburger-line:nth-child(1) {
+		transform: rotate(45deg) translate(5px, 5px);
+	}
+	.menu-toggle.open .hamburger-line:nth-child(2) {
+		opacity: 0;
+	}
+	.menu-toggle.open .hamburger-line:nth-child(3) {
+		transform: rotate(-45deg) translate(5px, -5px);
+	}
+
+	/* Mobile styles */
+	@media (max-width: 768px) {
+		.header-content { padding: 0 16px; gap: 16px; }
+		.logo-text { font-size: 1.1rem; }
+		.live-badge { display: none; }
+		.menu-toggle { display: flex; }
+
+		.nav {
+			position: fixed;
+			top: 64px;
+			left: 0;
+			right: 0;
+			bottom: 0;
+			background: var(--bg-primary);
+			flex-direction: column;
+			padding: 24px;
+			gap: 8px;
+			transform: translateX(-100%);
+			transition: transform 0.3s ease;
+			z-index: 99;
+		}
+		.nav.open {
+			transform: translateX(0);
+		}
+		.nav-link {
+			padding: 16px;
+			font-size: 1.1rem;
+			border-bottom: 1px solid var(--border-subtle);
+		}
+		body.menu-open { overflow: hidden; }
+		.main { padding: 20px 16px; }
+	}
+
+	@media (max-width: 480px) {
+		.header-content { height: 56px; }
+		.logo-text { font-size: 1rem; }
+		.theme-toggle { width: 36px; height: 36px; font-size: 1rem; }
+		.main { padding: 16px 12px; }
+		.footer-content { padding: 32px 16px; }
+	}
 </style>

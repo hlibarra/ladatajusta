@@ -606,7 +606,133 @@ try {
 	.back-link { color: var(--accent-secondary); font-weight: 500; }
 
 	@media (max-width: 768px) {
-		.title { font-size: 1.75rem; }
-		.summary { font-size: 1.05rem; padding: 16px; }
+		.breadcrumb { margin-bottom: 16px; font-size: 0.85rem; }
+
+		.article-header {
+			flex-direction: column;
+			align-items: flex-start;
+			gap: 8px;
+			margin-bottom: 12px;
+		}
+
+		.title {
+			font-size: 1.6rem;
+			margin-bottom: 16px;
+		}
+
+		.agent-byline {
+			padding: 12px;
+			gap: 12px;
+		}
+
+		.agent-avatar {
+			width: 48px;
+			height: 48px;
+		}
+
+		.agent-name { font-size: 1rem; }
+
+		.summary {
+			font-size: 1rem;
+			padding: 14px;
+			margin-bottom: 20px;
+		}
+
+		.tags {
+			gap: 6px;
+			margin-bottom: 24px;
+		}
+
+		.tag {
+			padding: 5px 10px;
+			font-size: 0.8rem;
+		}
+
+		/* Reading level buttons en stack vertical en móvil */
+		.reading-level-selector {
+			padding: 16px;
+			margin-bottom: 24px;
+		}
+
+		.level-buttons {
+			flex-direction: column;
+			gap: 8px;
+		}
+
+		.level-btn {
+			min-width: 100%;
+			padding: 14px 16px;
+			flex-direction: row;
+			align-items: center;
+			justify-content: space-between;
+		}
+
+		.level-name { font-size: 0.9rem; }
+		.level-desc { font-size: 0.75rem; }
+
+		.body-content p {
+			font-size: 1rem;
+			line-height: 1.7;
+		}
+
+		.article-footer {
+			padding-top: 24px;
+			gap: 20px;
+		}
+
+		.votes {
+			flex-direction: column;
+			align-items: flex-start;
+			gap: 10px;
+		}
+
+		.votes-label { font-size: 0.9rem; }
+
+		.vote-btn {
+			padding: 12px 24px;
+			font-size: 0.95rem;
+		}
+
+		.media-item img {
+			max-height: 400px;
+		}
+	}
+
+	@media (max-width: 480px) {
+		.title { font-size: 1.4rem; }
+
+		.category {
+			padding: 4px 10px;
+			font-size: 0.75rem;
+		}
+
+		.date { font-size: 0.8rem; }
+
+		.summary {
+			font-size: 0.95rem;
+			padding: 12px;
+			border-left-width: 3px;
+		}
+
+		.agent-byline {
+			flex-direction: column;
+			align-items: flex-start;
+			text-align: left;
+		}
+
+		.body-content p {
+			font-size: 0.95rem;
+			margin-bottom: 14px;
+		}
+
+		.vote-btn {
+			padding: 10px 18px;
+			width: 100%;
+			justify-content: center;
+		}
+
+		.media-item img {
+			max-height: 300px;
+		}
 	}
 </style>

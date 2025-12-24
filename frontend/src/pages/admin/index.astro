@@ -341,8 +341,77 @@ import AdminLayout from '../../layouts/AdminLayout.astro';
   }
 
   @media (max-width: 768px) {
+    .stats-grid {
+      grid-template-columns: repeat(2, 1fr);
+      gap: 12px;
+    }
+
+    .stat-card {
+      padding: 16px;
+      gap: 12px;
+    }
+
+    .stat-icon {
+      width: 40px;
+      height: 40px;
+    }
+
+    .stat-value {
+      font-size: 1.4rem;
+    }
+
+    .stat-label {
+      font-size: 0.75rem;
+    }
+
     .dashboard-grid {
       grid-template-columns: 1fr;
+      gap: 16px;
+    }
+
+    .card {
+      padding: 16px;
+    }
+
+    .votes-display,
+    .ai-stats {
+      gap: 24px;
+    }
+
+    .vote-value,
+    .ai-value {
+      font-size: 1.5rem;
+    }
+
+    .source-name {
+      width: 80px;
+      font-size: 0.8rem;
+    }
+
+    .source-count {
+      font-size: 0.8rem;
+    }
+  }
+
+  @media (max-width: 480px) {
+    .stats-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .stat-card {
+      flex-direction: row;
+      justify-content: flex-start;
+    }
+
+    .votes-display,
+    .ai-stats {
+      flex-wrap: wrap;
+      gap: 16px;
+    }
+
+    .vote-stat,
+    .ai-stat {
+      min-width: 45%;
     }
   }
 </style>

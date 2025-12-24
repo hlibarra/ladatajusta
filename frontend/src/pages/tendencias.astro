@@ -213,12 +213,78 @@ const categoryList = Object.entries(categories);
 	}
 
 	@media (max-width: 768px) {
+		.page-header {
+			margin-bottom: 28px;
+			padding-bottom: 20px;
+		}
+
 		.page-title {
 			font-size: 1.75rem;
 		}
 
+		.page-subtitle {
+			font-size: 1rem;
+		}
+
+		.categories {
+			gap: 32px;
+		}
+
+		.category-section {
+			padding-bottom: 24px;
+		}
+
+		.category-header {
+			flex-wrap: wrap;
+			gap: 8px;
+		}
+
+		.category-title {
+			font-size: 1.25rem;
+		}
+
 		.category-grid {
 			grid-template-columns: 1fr;
+			gap: 12px;
+		}
+
+		.trend-card {
+			padding: 16px;
+		}
+
+		.trend-title {
+			font-size: 1rem;
+		}
+
+		.trend-summary {
+			font-size: 0.85rem;
+		}
+	}
+
+	@media (max-width: 480px) {
+		.page-title {
+			font-size: 1.5rem;
+		}
+
+		.page-subtitle {
+			font-size: 0.9rem;
+		}
+
+		.category-title {
+			font-size: 1.1rem;
+		}
+
+		.category-count {
+			font-size: 0.75rem;
+		}
+
+		.trend-card {
+			padding: 14px;
+		}
+
+		.tag {
+			font-size: 0.7rem;
+			padding: 2px 6px;
 		}
 	}
 </style>
