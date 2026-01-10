@@ -1,0 +1,269 @@
+/* Estilo Infobae - LaDataJusta */
+
+/* Hero Section - Noticia Principal */
+.hero-section {
+	margin-bottom: 24px;
+	border-bottom: 3px solid #e63946;
+	padding-bottom: 24px;
+}
+
+.hero-article {
+	max-width: 1200px;
+}
+
+.volanta {
+	display: inline-block;
+	font-size: 0.75rem;
+	font-weight: 700;
+	color: #e63946;
+	letter-spacing: 0.5px;
+	margin-bottom: 8px;
+	text-transform: uppercase;
+}
+
+.hero-title {
+	display: block;
+	font-size: 2.5rem;
+	font-weight: 700;
+	line-height: 1.1;
+	color: #1a1a1a;
+	margin-bottom: 12px;
+	text-decoration: none;
+	font-family: Georgia, 'Times New Roman', serif;
+}
+
+.hero-title:hover {
+	color: #e63946;
+}
+
+.hero-summary {
+	font-size: 1.1rem;
+	line-height: 1.5;
+	color: #4a4a4a;
+	margin: 0;
+}
+
+/* Layout Principal - 2 columnas */
+.main-container {
+	display: grid;
+	grid-template-columns: 1fr 300px;
+	gap: 32px;
+	max-width: 1200px;
+	margin: 0 auto;
+}
+
+.main-column {
+	min-width: 0;
+}
+
+/* Noticias Destacadas Secundarias */
+.secondary-featured {
+	display: grid;
+	grid-template-columns: repeat(2, 1fr);
+	gap: 24px;
+	margin-bottom: 24px;
+}
+
+.secondary-article {
+	border-bottom: 1px solid #e0e0e0;
+	padding-bottom: 16px;
+}
+
+.volanta-small {
+	display: inline-block;
+	font-size: 0.7rem;
+	font-weight: 700;
+	color: #e63946;
+	letter-spacing: 0.5px;
+	margin-bottom: 6px;
+}
+
+.secondary-title {
+	display: block;
+	font-size: 1.4rem;
+	font-weight: 700;
+	line-height: 1.2;
+	color: #1a1a1a;
+	margin-bottom: 8px;
+	text-decoration: none;
+	font-family: Georgia, 'Times New Roman', serif;
+}
+
+.secondary-title:hover {
+	color: #e63946;
+}
+
+.secondary-summary {
+	font-size: 0.95rem;
+	line-height: 1.4;
+	color: #666;
+	margin: 0;
+}
+
+/* Separador rojo */
+.section-divider {
+	height: 3px;
+	background: #e63946;
+	margin: 24px 0;
+}
+
+/* Lista de noticias - estilo compacto */
+.news-list {
+	display: flex;
+	flex-direction: column;
+	gap: 20px;
+}
+
+.news-item {
+	border-bottom: 1px solid #e0e0e0;
+	padding-bottom: 16px;
+}
+
+.item-volanta {
+	display: inline-block;
+	font-size: 0.7rem;
+	font-weight: 700;
+	color: #e63946;
+	letter-spacing: 0.5px;
+	margin-bottom: 4px;
+}
+
+.item-title {
+	display: block;
+	font-size: 1.2rem;
+	font-weight: 700;
+	line-height: 1.3;
+	color: #1a1a1a;
+	margin-bottom: 6px;
+	text-decoration: none;
+	font-family: Georgia, 'Times New Roman', serif;
+}
+
+.item-title:hover {
+	color: #e63946;
+}
+
+.item-summary {
+	font-size: 0.9rem;
+	line-height: 1.4;
+	color: #666;
+	margin: 0 0 8px 0;
+}
+
+.item-meta {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+}
+
+.item-votes {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+
+.vote-btn {
+	background: none;
+	border: 1px solid #ddd;
+	border-radius: 4px;
+	padding: 4px 10px;
+	font-size: 0.9rem;
+	cursor: pointer;
+	transition: all 0.2s;
+}
+
+.vote-btn:hover {
+	border-color: #e63946;
+	background: rgba(230, 57, 70, 0.05);
+}
+
+.vote-counts {
+	font-size: 0.85rem;
+	color: #666;
+}
+
+/* Sidebar */
+.sidebar {
+	position: sticky;
+	top: 80px;
+	height: fit-content;
+}
+
+.sidebar-section {
+	background: #f8f8f8;
+	padding: 16px;
+	margin-bottom: 24px;
+}
+
+.sidebar-title {
+	font-size: 0.9rem;
+	font-weight: 700;
+	color: #1a1a1a;
+	letter-spacing: 0.5px;
+	margin: 0 0 12px 0;
+}
+
+.sidebar-divider {
+	height: 2px;
+	background: #e63946;
+	margin-bottom: 16px;
+}
+
+/* Load more */
+#load-more-container {
+	margin-top: 32px;
+}
+
+#loading-indicator {
+	padding: 20px;
+}
+
+/* Responsive */
+@media (max-width: 968px) {
+	.main-container {
+		grid-template-columns: 1fr;
+	}
+
+	.sidebar {
+		display: none;
+	}
+
+	.secondary-featured {
+		grid-template-columns: 1fr;
+	}
+
+	.hero-title {
+		font-size: 2rem;
+	}
+}
+
+@media (max-width: 640px) {
+	.hero-title {
+		font-size: 1.6rem;
+	}
+
+	.secondary-title {
+		font-size: 1.2rem;
+	}
+
+	.item-title {
+		font-size: 1.1rem;
+	}
+}
+
+/* Empty/Error states */
+.error-card,
+.empty-card {
+	padding: 40px;
+	text-align: center;
+	background: #f8f8f8;
+	border-radius: 8px;
+	margin: 40px 0;
+}
+
+.empty-hint {
+	display: block;
+	color: #999;
+	font-size: 0.9rem;
+	margin-top: 8px;
+}

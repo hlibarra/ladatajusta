@@ -1,6 +1,5 @@
 ---
 import Layout from '../layouts/Layout.astro';
-import Skeleton from '../components/Skeleton.astro';
 
 interface Agent {
 	id: string;
@@ -15,6 +14,7 @@ interface Publication {
 	id: string;
 	state: string;
 	title: string;
+	slug: string;
 	summary: string;
 	body: string;
 	category?: string | null;
@@ -22,6 +22,10 @@ interface Publication {
 	created_at: string;
 	published_at?: string | null;
 	agent?: Agent | null;
+	content_sin_vueltas?: string | null;
+	content_lo_central?: string | null;
+	content_en_profundidad?: string | null;
+	image_url?: string | null;
 }
 
 interface PaginatedResponse {
@@ -37,8 +41,8 @@ const SITE_URL = import.meta.env.SITE ?? 'http://localhost:4321';
 
 let pubs: Publication[] = [];
 let total = 0;
-let hasMore = false;
 let error = false;
+let agents: Agent[] = [];
 
 try {
 	const res = await fetch(`${API_BASE}/api/publications/search?limit=30`);
@@ -46,7 +50,6 @@ try {
 		const data: PaginatedResponse = await res.json();
 		pubs = data.items;
 		total = data.total;
-		hasMore = data.has_more;
 	} else {
 		error = true;
 	}
@@ -54,9 +57,19 @@ try {
 	error = true;
 }
 
-// Separar noticias destacadas (hasta 3)
-const featuredPubs = pubs.slice(0, 2); // Por ahora 2, puede ser 1-3
-const remainingPubs = pubs.slice(featuredPubs.length);
+// Obtener agentes
+try {
+	const res = await fetch(`${API_BASE}/api/agents`);
+	if (res.ok) {
+		agents = await res.json();
+	}
+} catch (e) {
+	console.error('Error loading agents:', e);
+}
+
+// Separar noticias destacadas
+const featuredPubs = pubs.slice(0, 4); // 4 noticias destacadas
+const remainingPubs = pubs.slice(featuredPubs.length, featuredPubs.length + 8); // Solo 8 noticias (4 filas × 2 columnas)
 ---
 
 <Layout>
@@ -71,16 +84,24 @@ const remainingPubs = pubs.slice(featuredPubs.length);
 		</div>
 	) : (
 		<>
-			{/* Sección de noticias destacadas */}
+			{/* Noticias destacadas */}
 			{featuredPubs.length > 0 && (
 				<section class="featured-section">
 					<div class="featured-grid">
 						{featuredPubs.map((pub, index) => (
-							<article class={`featured-card ${index === 0 ? 'featured-main' : 'featured-secondary'}`} data-id={pub.id}>
+							<article
+								class:list={['featured-card', index === 0 ? 'featured-main' : 'featured-secondary']}
+								data-id={pub.id}
+							>
+								{pub.image_url && (
+									<div class="featured-image">
+										<img src={pub.image_url} alt={pub.title} loading="lazy" />
+									</div>
+								)}
 								<div class="featured-content">
 									{pub.category && <span class="featured-category">{pub.category}</span>}
-									<a class="featured-title" href={`/p/${pub.id}`}>{pub.title}</a>
-									<p class="featured-summary">{pub.summary}</p>
+									<a class="featured-title" href={`/p/${pub.slug}`}>{pub.title}</a>
+									<p class="featured-summary">{pub.content_sin_vueltas || pub.summary}</p>
 								</div>
 							</article>
 						))}
@@ -88,47 +109,186 @@ const remainingPubs = pubs.slice(featuredPubs.length);
 				</section>
 			)}
 
-			{/* Grid de noticias en 3 columnas */}
+			{/* Noticias regulares con sidebar de publicidad */}
 			<section class="news-section">
-				<div class="section-header">
-					<h2 class="section-title">Ultimas noticias</h2>
-					<span class="section-badge" id="pub-count">{total} publicaciones</span>
-				</div>
+				<header class="section-header">
+					<h2 class="section-title">Todas las noticias</h2>
+					<span class="section-badge">{total} publicaciones</span>
+				</header>
 
-				<div class="news-grid" id="news-grid">
-					{remainingPubs.map((p) => (
-						<article class="news-card" data-id={p.id}>
-							{p.category && <span class="card-category">{p.category}</span>}
-							<a class="card-title" href={`/p/${p.id}`}>{p.title}</a>
-							<p class="card-summary">{p.summary}</p>
-							<div class="card-footer">
-								<div class="card-tags">
-									{(p.tags ?? []).slice(0, 2).map((t) => (
-										<span class="tag">{t}</span>
-									))}
+				<div class="news-with-ads">
+					{/* Columna de noticias (2 columnas) */}
+					<div class="news-grid" id="news-grid">
+						{remainingPubs.map((p) => (
+							<article class="news-card" data-id={p.id}>
+								{/* Imagen de la noticia */}
+								{p.image_url && (
+									<div class="card-image">
+										<img src={p.image_url} alt={p.title} loading="lazy" />
+									</div>
+								)}
+
+								<div class="card-content">
+									{p.category && <span class="card-category">{p.category}</span>}
+									<a class="card-title" href={`/p/${p.slug}`}>{p.title}</a>
+									<p class="card-summary">{p.content_sin_vueltas || p.summary}</p>
+									<footer class="card-footer">
+										<div class="card-tags">
+											{p.tags.slice(0, 2).map((tag) => (
+												<span class="tag">{tag}</span>
+											))}
+										</div>
+										<div class="card-votes">
+											<button class="vote-btn hot" data-type="hot">🔥</button>
+											<button class="vote-btn cold" data-type="cold">❄️</button>
+											<span class="vote-counts"></span>
+										</div>
+									</footer>
 								</div>
-								<div class="card-votes">
-									<button class="vote-btn hot" data-type="hot">🔥</button>
-									<button class="vote-btn cold" data-type="cold">❄️</button>
-									<span class="vote-counts"></span>
-								</div>
+							</article>
+						))}
+					</div>
+
+					{/* Columna de publicidad */}
+					<aside class="ads-sidebar">
+						<div class="ad-block">
+							<span class="ad-label">PUBLICIDAD</span>
+							<div class="ad-content">
+								<p>Espacio publicitario disponible</p>
 							</div>
-						</article>
-					))}
+						</div>
+						<div class="ad-block">
+							<span class="ad-label">PUBLICIDAD</span>
+							<div class="ad-content">
+								<p>Espacio publicitario disponible</p>
+							</div>
+						</div>
+					</aside>
 				</div>
 			</section>
+
+			{/* Sección de tendencias */}
+			<section class="trending-section">
+				<div class="trending-container">
+					<div class="trending-header">
+						<h2 class="section-title">Tendencias</h2>
+						<span class="trending-badge">🔥 Lo más leído</span>
+					</div>
+					<div class="trending-grid">
+						<article class="trending-item">
+							<span class="trending-number">1</span>
+							<div class="trending-content">
+								<span class="trending-category">POLÍTICA</span>
+								<h3 class="trending-title">Título de la noticia más leída del momento</h3>
+								<span class="trending-views">12.5K lecturas</span>
+							</div>
+						</article>
+						<article class="trending-item">
+							<span class="trending-number">2</span>
+							<div class="trending-content">
+								<span class="trending-category">DEPORTES</span>
+								<h3 class="trending-title">Segunda noticia más popular de hoy</h3>
+								<span class="trending-views">10.2K lecturas</span>
+							</div>
+						</article>
+						<article class="trending-item">
+							<span class="trending-number">3</span>
+							<div class="trending-content">
+								<span class="trending-category">TECNOLOGÍA</span>
+								<h3 class="trending-title">Avances tecnológicos que están cambiando el mundo</h3>
+								<span class="trending-views">8.7K lecturas</span>
+							</div>
+						</article>
+						<article class="trending-item">
+							<span class="trending-number">4</span>
+							<div class="trending-content">
+								<span class="trending-category">ESPECTÁCULOS</span>
+								<h3 class="trending-title">Lo último en el mundo del entretenimiento</h3>
+								<span class="trending-views">7.3K lecturas</span>
+							</div>
+						</article>
+						<article class="trending-item">
+							<span class="trending-number">5</span>
+							<div class="trending-content">
+								<span class="trending-category">ECONOMÍA</span>
+								<h3 class="trending-title">Análisis económico de la semana</h3>
+								<span class="trending-views">6.1K lecturas</span>
+							</div>
+						</article>
+					</div>
+				</div>
+			</section>
+
+			{/* Sección de redes sociales */}
+			<section class="social-section">
+				<div class="social-container">
+					<h2 class="section-title">Síguenos en Redes</h2>
+					<div class="social-grid">
+						<div class="social-block instagram">
+							<div class="social-header">
+								<span class="social-icon">📷</span>
+								<h3>Instagram</h3>
+							</div>
+							<div class="social-content">
+								<p>Contenido de Instagram se mostrará aquí</p>
+								<p class="social-placeholder">Widget de Instagram</p>
+							</div>
+						</div>
+						<div class="social-block twitter">
+							<div class="social-header">
+								<span class="social-icon">🐦</span>
+								<h3>Twitter/X</h3>
+							</div>
+							<div class="social-content">
+								<p>Contenido de Twitter se mostrará aquí</p>
+								<p class="social-placeholder">Widget de Twitter</p>
+							</div>
+						</div>
+						<div class="social-block facebook">
+							<div class="social-header">
+								<span class="social-icon">👍</span>
+								<h3>Facebook</h3>
+							</div>
+							<div class="social-content">
+								<p>Contenido de Facebook se mostrará aquí</p>
+								<p class="social-placeholder">Widget de Facebook</p>
+							</div>
+						</div>
+					</div>
+				</div>
+			</section>
+
+			{/* Sección de agentes */}
+			{agents.length > 0 && (
+				<section class="agents-section">
+					<div class="agents-container">
+						<h2 class="section-title">Nuestros Agentes IA</h2>
+						<p class="agents-subtitle">Conoce a los agentes de inteligencia artificial que crean contenido para LaDataJusta</p>
+						<div class="agents-grid">
+							{agents.map((agent) => (
+								<article class="agent-card">
+									<div class="agent-avatar">
+										{agent.avatar_url ? (
+											<img src={agent.avatar_url} alt={agent.name} />
+										) : (
+											<div class="agent-avatar-placeholder">
+												<span>🤖</span>
+											</div>
+										)}
+									</div>
+									<div class="agent-info">
+										<h3 class="agent-name">{agent.name}</h3>
+										<p class="agent-title">{agent.specialization || 'Agente IA'}</p>
+										<p class="agent-description">{agent.description}</p>
+									</div>
+								</article>
+							))}
+						</div>
+					</div>
+				</section>
+			)}
 		</>
 	)}
-
-		{hasMore && (
-			<div id="load-more-container">
-				<div id="loading-indicator" style="display: none;">
-					<Skeleton count={2} />
-				</div>
-				<div id="scroll-trigger"></div>
-			</div>
-		)}
-	</section>
 </Layout>
 
 <script>
@@ -145,7 +305,7 @@ const remainingPubs = pubs.slice(featuredPubs.length);
 
 	// Voting
 	function setupVoting(container: Element) {
-		container.querySelectorAll('article.news-card').forEach((card) => {
+		container.querySelectorAll('article.news-card, article.featured-card').forEach((card) => {
 			const id = card.getAttribute('data-id');
 			if (!id) return;
 			const countsEl = card.querySelector('.vote-counts');
@@ -175,21 +335,30 @@ const remainingPubs = pubs.slice(featuredPubs.length);
 
 	// Create news card HTML
 	function createCardHTML(p: any): string {
-		const tags = (p.tags || []).slice(0, 2).map((t: string) => `<span class="tag">${t}</span>`).join('');
+		const image = p.image_url ? `
+			<div class="card-image">
+				<img src="${p.image_url}" alt="${p.title}" loading="lazy" />
+			</div>
+		` : '';
 		const category = p.category ? `<span class="card-category">${p.category}</span>` : '';
+		const tags = p.tags.slice(0, 2).map((tag: string) => `<span class="tag">${tag}</span>`).join('');
+		const summary = p.content_sin_vueltas || p.summary;
 
 		return `
 			<article class="news-card" data-id="${p.id}">
-				${category}
-				<a class="card-title" href="/p/${p.id}">${p.title}</a>
-				<p class="card-summary">${p.summary}</p>
-				<div class="card-footer">
-					<div class="card-tags">${tags}</div>
-					<div class="card-votes">
-						<button class="vote-btn hot" data-type="hot">🔥</button>
-						<button class="vote-btn cold" data-type="cold">❄️</button>
-						<span class="vote-counts"></span>
-					</div>
+				${image}
+				<div class="card-content">
+					${category}
+					<a class="card-title" href="/p/${p.slug}">${p.title}</a>
+					<p class="card-summary">${summary}</p>
+					<footer class="card-footer">
+						<div class="card-tags">${tags}</div>
+						<div class="card-votes">
+							<button class="vote-btn hot" data-type="hot">🔥</button>
+							<button class="vote-btn cold" data-type="cold">❄️</button>
+							<span class="vote-counts"></span>
+						</div>
+					</footer>
 				</div>
 			</article>
 		`;
@@ -287,21 +456,45 @@ const remainingPubs = pubs.slice(featuredPubs.length);
 		grid-template-columns: 1fr;
 	}
 
-	/* Grid responsive: 1 columna en mobile, 2 en tablet+, 3 en desktop */
+	/* Layout: 1 noticia grande + 3 pequeñas */
 	@media (min-width: 768px) {
 		.featured-grid {
 			grid-template-columns: repeat(2, 1fr);
+			grid-template-rows: repeat(2, 1fr);
+		}
+
+		/* La primera noticia ocupa 2 filas */
+		.featured-grid .featured-card:first-child {
+			grid-row: 1 / 3;
 		}
 	}
 
-	@media (min-width: 1200px) {
+	@media (min-width: 1024px) {
 		.featured-grid {
-			grid-template-columns: repeat(3, 1fr);
+			grid-template-columns: 2fr 1fr 1fr;
+			grid-template-rows: auto auto;
 		}
 
-		/* Cuando hay 2 items, la primera ocupa 2 columnas */
-		.featured-grid:has(.featured-card:nth-child(2):last-child) {
-			grid-template-columns: 2fr 1fr;
+		/* La primera noticia ocupa 2 filas */
+		.featured-grid .featured-card:first-child {
+			grid-row: 1 / 3;
+			grid-column: 1;
+		}
+
+		/* Las otras 3 se distribuyen a la derecha */
+		.featured-grid .featured-card:nth-child(2) {
+			grid-column: 2;
+			grid-row: 1;
+		}
+
+		.featured-grid .featured-card:nth-child(3) {
+			grid-column: 3;
+			grid-row: 1;
+		}
+
+		.featured-grid .featured-card:nth-child(4) {
+			grid-column: 2 / 4;
+			grid-row: 2;
 		}
 	}
 
@@ -309,13 +502,47 @@ const remainingPubs = pubs.slice(featuredPubs.length);
 		background: var(--bg-card);
 		border: 1px solid var(--border-medium);
 		border-radius: var(--radius-lg);
-		padding: 28px;
+		overflow: hidden;
 		transition: all 0.3s ease;
+		display: flex;
+		flex-direction: column;
 	}
 
 	.featured-card:hover {
 		border-color: var(--accent-primary);
 		box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+	}
+
+	.featured-image {
+		width: 100%;
+		overflow: hidden;
+		background: var(--bg-secondary);
+	}
+
+	.featured-main .featured-image {
+		height: 400px;
+	}
+
+	.featured-secondary .featured-image {
+		height: 200px;
+	}
+
+	.featured-image img {
+		width: 100%;
+		height: 100%;
+		object-fit: cover;
+		transition: transform 0.3s ease;
+	}
+
+	.featured-card:hover .featured-image img {
+		transform: scale(1.05);
+	}
+
+	.featured-content {
+		padding: 28px;
+		flex: 1;
+		display: flex;
+		flex-direction: column;
 	}
 
 	/* La primera noticia es más grande */
@@ -411,7 +638,20 @@ const remainingPubs = pubs.slice(featuredPubs.length);
 	.error-card p, .empty-card p { margin: 0 0 8px; color: var(--text-secondary); }
 	.empty-hint { font-size: 0.9rem; color: var(--text-muted); }
 
-	/* Grid de 3 columnas estilo Infobae */
+	/* Layout: 2 columnas de noticias + 1 columna de ads */
+	.news-with-ads {
+		display: grid;
+		gap: 32px;
+		grid-template-columns: 1fr;
+	}
+
+	@media (min-width: 1024px) {
+		.news-with-ads {
+			grid-template-columns: 1fr 300px;
+		}
+	}
+
+	/* Grid de noticias: 2 columnas en desktop, 1 en mobile */
 	.news-grid {
 		display: grid;
 		gap: 24px;
@@ -424,22 +664,45 @@ const remainingPubs = pubs.slice(featuredPubs.length);
 		}
 	}
 
-	@media (min-width: 1200px) {
-		.news-grid {
-			grid-template-columns: repeat(3, 1fr);
-		}
-	}
-
-	/* Cards compactas estilo Infobae */
+	/* News cards */
 	.news-card {
 		background: var(--bg-card);
-		border-bottom: 3px solid var(--border-subtle);
-		padding: 0 0 20px 0;
+		border: 1px solid var(--border-medium);
+		border-radius: var(--radius-lg);
+		overflow: hidden;
 		transition: all 0.2s ease;
+		display: flex;
+		flex-direction: column;
 	}
 
 	.news-card:hover {
-		border-bottom-color: var(--accent-primary);
+		border-color: var(--accent-primary);
+		box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+	}
+
+	.card-image {
+		width: 100%;
+		height: 200px;
+		overflow: hidden;
+		background: var(--bg-secondary);
+	}
+
+	.card-image img {
+		width: 100%;
+		height: 100%;
+		object-fit: cover;
+		transition: transform 0.3s ease;
+	}
+
+	.news-card:hover .card-image img {
+		transform: scale(1.05);
+	}
+
+	.card-content {
+		padding: 24px;
+		flex: 1;
+		display: flex;
+		flex-direction: column;
 	}
 
 	.card-category {
@@ -457,10 +720,10 @@ const remainingPubs = pubs.slice(featuredPubs.length);
 
 	.card-title {
 		display: block;
-		font-size: 1.15rem;
+		font-size: 1.25rem;
 		font-weight: 700;
 		color: var(--text-primary);
-		margin-bottom: 10px;
+		margin-bottom: 12px;
 		line-height: 1.4;
 		transition: color 0.2s;
 	}
@@ -548,6 +811,612 @@ const remainingPubs = pubs.slice(featuredPubs.length);
 		white-space: nowrap;
 	}
 
+	/* Ads Sidebar */
+	.ads-sidebar {
+		display: flex;
+		flex-direction: column;
+		gap: 24px;
+	}
+
+	@media (min-width: 1024px) {
+		.ads-sidebar {
+			position: sticky;
+			top: 80px;
+			height: fit-content;
+		}
+	}
+
+	.ad-block {
+		background: var(--bg-card);
+		border: 2px dashed var(--border-medium);
+		border-radius: var(--radius-lg);
+		overflow: hidden;
+	}
+
+	.ad-label {
+		display: block;
+		padding: 8px 12px;
+		background: var(--bg-secondary);
+		font-size: 0.7rem;
+		font-weight: 600;
+		color: var(--text-muted);
+		text-align: center;
+		letter-spacing: 1px;
+	}
+
+	.ad-content {
+		padding: 60px 20px;
+		text-align: center;
+		background: var(--bg-card);
+		min-height: 250px;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+	}
+
+	.ad-content p {
+		margin: 0;
+		color: var(--text-muted);
+		font-size: 0.9rem;
+	}
+
+	/* Full Width Section - Sección de una columna */
+	.full-width-section {
+		margin: 48px 0;
+		padding: 48px 0;
+		background: var(--bg-secondary);
+		border-top: 1px solid var(--border-subtle);
+		border-bottom: 1px solid var(--border-subtle);
+	}
+
+	.full-width-container {
+		max-width: 1200px;
+		margin: 0 auto;
+		padding: 0 24px;
+	}
+
+	.full-width-content {
+		background: var(--bg-card);
+		border: 1px solid var(--border-medium);
+		border-radius: var(--radius-lg);
+		padding: 40px;
+		margin-top: 24px;
+	}
+
+	.full-width-content p {
+		margin: 0;
+		color: var(--text-secondary);
+		line-height: 1.8;
+		font-size: 1.1rem;
+	}
+
+	/* Magazine Section - Estilo revista: 1 grande + 4 pequeñas */
+	.magazine-section {
+		margin: 48px 0;
+		padding: 48px 0;
+		background: var(--bg-card);
+	}
+
+	.magazine-container {
+		max-width: 1200px;
+		margin: 0 auto;
+		padding: 0 24px;
+	}
+
+	.magazine-layout {
+		display: grid;
+		gap: 24px;
+		grid-template-columns: 1fr;
+	}
+
+	@media (min-width: 1024px) {
+		.magazine-layout {
+			grid-template-columns: 1.2fr 1fr;
+		}
+	}
+
+	/* Noticia principal grande */
+	.magazine-main {
+		background: var(--bg-card);
+		border: 1px solid var(--border-medium);
+		border-radius: var(--radius-lg);
+		overflow: hidden;
+		transition: all 0.3s ease;
+	}
+
+	.magazine-main:hover {
+		box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+		transform: translateY(-2px);
+	}
+
+	.magazine-main-image {
+		width: 100%;
+		height: 400px;
+		overflow: hidden;
+		background: var(--bg-secondary);
+	}
+
+	.magazine-main-image img {
+		width: 100%;
+		height: 100%;
+		object-fit: cover;
+		transition: transform 0.3s ease;
+	}
+
+	.magazine-main:hover .magazine-main-image img {
+		transform: scale(1.05);
+	}
+
+	.magazine-main-content {
+		padding: 32px;
+	}
+
+	.magazine-date {
+		display: inline-block;
+		font-size: 0.85rem;
+		color: var(--text-muted);
+		margin-bottom: 8px;
+	}
+
+	.magazine-category {
+		display: inline-block;
+		padding: 4px 12px;
+		background: var(--accent-primary);
+		color: white;
+		font-size: 0.7rem;
+		font-weight: 700;
+		text-transform: uppercase;
+		letter-spacing: 0.5px;
+		border-radius: var(--radius-sm);
+		margin-left: 12px;
+	}
+
+	.magazine-main-title {
+		font-size: 1.8rem;
+		font-weight: 800;
+		line-height: 1.2;
+		color: var(--text-primary);
+		margin: 16px 0 12px;
+	}
+
+	.magazine-main-summary {
+		font-size: 1rem;
+		line-height: 1.6;
+		color: var(--text-secondary);
+		margin: 0;
+	}
+
+	/* Noticias pequeñas del sidebar */
+	.magazine-sidebar {
+		display: grid;
+		gap: 16px;
+		grid-template-columns: 1fr;
+	}
+
+	@media (min-width: 768px) and (max-width: 1023px) {
+		.magazine-sidebar {
+			grid-template-columns: repeat(2, 1fr);
+		}
+	}
+
+	.magazine-small {
+		background: var(--bg-card);
+		border: 1px solid var(--border-medium);
+		border-radius: var(--radius-lg);
+		overflow: hidden;
+		transition: all 0.2s ease;
+	}
+
+	.magazine-small:hover {
+		border-color: var(--accent-primary);
+		box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+	}
+
+	.magazine-small-image {
+		width: 100%;
+		height: 160px;
+		overflow: hidden;
+		background: var(--bg-secondary);
+	}
+
+	.magazine-small-image img {
+		width: 100%;
+		height: 100%;
+		object-fit: cover;
+		transition: transform 0.3s ease;
+	}
+
+	.magazine-small:hover .magazine-small-image img {
+		transform: scale(1.05);
+	}
+
+	.magazine-small-content {
+		padding: 16px;
+	}
+
+	.magazine-small-category {
+		display: inline-block;
+		font-size: 0.65rem;
+		font-weight: 700;
+		color: var(--accent-secondary);
+		text-transform: uppercase;
+		letter-spacing: 0.5px;
+		margin-bottom: 8px;
+	}
+
+	.magazine-small-title {
+		font-size: 0.95rem;
+		font-weight: 700;
+		line-height: 1.3;
+		color: var(--text-primary);
+		margin: 0;
+	}
+
+	/* Trending Section - Tendencias */
+	.trending-section {
+		margin: 48px 0;
+		padding: 48px 0;
+		background: linear-gradient(135deg, rgba(230, 57, 70, 0.05) 0%, rgba(59, 130, 246, 0.05) 100%);
+	}
+
+	.trending-container {
+		max-width: 1200px;
+		margin: 0 auto;
+		padding: 0 24px;
+	}
+
+	.trending-header {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		margin-bottom: 32px;
+		flex-wrap: wrap;
+		gap: 12px;
+	}
+
+	.trending-badge {
+		padding: 8px 16px;
+		background: linear-gradient(135deg, #ff6b6b, #ee5a6f);
+		color: white;
+		border-radius: var(--radius-md);
+		font-size: 0.9rem;
+		font-weight: 600;
+		box-shadow: 0 4px 12px rgba(230, 57, 70, 0.3);
+	}
+
+	.trending-grid {
+		display: grid;
+		gap: 16px;
+		grid-template-columns: 1fr;
+	}
+
+	@media (min-width: 768px) {
+		.trending-grid {
+			grid-template-columns: repeat(2, 1fr);
+		}
+	}
+
+	@media (min-width: 1024px) {
+		.trending-grid {
+			grid-template-columns: repeat(5, 1fr);
+		}
+	}
+
+	.trending-item {
+		background: var(--bg-card);
+		border: 1px solid var(--border-medium);
+		border-radius: var(--radius-lg);
+		padding: 20px;
+		display: flex;
+		gap: 16px;
+		align-items: flex-start;
+		transition: all 0.3s ease;
+	}
+
+	.trending-item:hover {
+		transform: translateY(-4px);
+		box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+		border-color: var(--accent-primary);
+	}
+
+	.trending-number {
+		flex-shrink: 0;
+		width: 40px;
+		height: 40px;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+		color: white;
+		font-size: 1.2rem;
+		font-weight: 900;
+		border-radius: 50%;
+		box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+	}
+
+	.trending-content {
+		flex: 1;
+		min-width: 0;
+	}
+
+	.trending-category {
+		display: inline-block;
+		font-size: 0.65rem;
+		font-weight: 700;
+		color: var(--accent-secondary);
+		text-transform: uppercase;
+		letter-spacing: 0.5px;
+		margin-bottom: 6px;
+	}
+
+	.trending-title {
+		font-size: 0.95rem;
+		font-weight: 700;
+		line-height: 1.3;
+		color: var(--text-primary);
+		margin: 0 0 8px;
+		display: -webkit-box;
+		-webkit-line-clamp: 2;
+		-webkit-box-orient: vertical;
+		overflow: hidden;
+	}
+
+	.trending-views {
+		font-size: 0.75rem;
+		color: var(--text-muted);
+		font-weight: 500;
+	}
+
+	/* Social Section - Redes Sociales */
+	.social-section {
+		margin: 48px 0;
+		padding: 48px 0;
+	}
+
+	.social-container {
+		max-width: 1200px;
+		margin: 0 auto;
+		padding: 0 24px;
+	}
+
+	.social-grid {
+		display: grid;
+		gap: 24px;
+		grid-template-columns: 1fr;
+		margin-top: 24px;
+	}
+
+	@media (min-width: 768px) {
+		.social-grid {
+			grid-template-columns: repeat(2, 1fr);
+		}
+	}
+
+	@media (min-width: 1024px) {
+		.social-grid {
+			grid-template-columns: repeat(3, 1fr);
+		}
+	}
+
+	.social-block {
+		background: var(--bg-card);
+		border: 1px solid var(--border-medium);
+		border-radius: var(--radius-lg);
+		overflow: hidden;
+		transition: all 0.3s ease;
+	}
+
+	.social-block:hover {
+		transform: translateY(-4px);
+		box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
+	}
+
+	.social-block.instagram {
+		border-top: 4px solid #E1306C;
+	}
+
+	.social-block.twitter {
+		border-top: 4px solid #1DA1F2;
+	}
+
+	.social-block.facebook {
+		border-top: 4px solid #4267B2;
+	}
+
+	.social-header {
+		display: flex;
+		align-items: center;
+		gap: 12px;
+		padding: 20px 24px;
+		border-bottom: 1px solid var(--border-subtle);
+		background: var(--bg-secondary);
+	}
+
+	.social-icon {
+		font-size: 1.5rem;
+	}
+
+	.social-header h3 {
+		margin: 0;
+		font-size: 1.1rem;
+		font-weight: 700;
+		color: var(--text-primary);
+	}
+
+	.social-content {
+		padding: 32px 24px;
+		text-align: center;
+		min-height: 300px;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+		gap: 12px;
+	}
+
+	.social-content p {
+		margin: 0;
+		color: var(--text-secondary);
+	}
+
+	.social-placeholder {
+		padding: 16px 24px;
+		background: var(--bg-secondary);
+		border: 2px dashed var(--border-medium);
+		border-radius: var(--radius-md);
+		color: var(--text-muted);
+		font-size: 0.9rem;
+		font-weight: 500;
+	}
+
+	/* Agents Section - Agentes IA */
+	.agents-section {
+		margin: 48px 0;
+		padding: 64px 0;
+		background: linear-gradient(135deg, rgba(99, 102, 241, 0.05) 0%, rgba(168, 85, 247, 0.05) 100%);
+		border-top: 2px solid var(--border-subtle);
+	}
+
+	.agents-container {
+		max-width: 1200px;
+		margin: 0 auto;
+		padding: 0 24px;
+	}
+
+	.agents-subtitle {
+		text-align: center;
+		color: var(--text-secondary);
+		font-size: 1.1rem;
+		margin: 12px 0 48px;
+		max-width: 600px;
+		margin-left: auto;
+		margin-right: auto;
+	}
+
+	.agents-grid {
+		display: grid;
+		gap: 32px;
+		grid-template-columns: 1fr;
+	}
+
+	@media (min-width: 640px) {
+		.agents-grid {
+			grid-template-columns: repeat(2, 1fr);
+		}
+	}
+
+	@media (min-width: 1024px) {
+		.agents-grid {
+			grid-template-columns: repeat(3, 1fr);
+		}
+	}
+
+	@media (min-width: 1280px) {
+		.agents-grid {
+			grid-template-columns: repeat(4, 1fr);
+		}
+	}
+
+	.agent-card {
+		background: var(--bg-card);
+		border: 2px solid var(--border-medium);
+		border-radius: var(--radius-lg);
+		padding: 32px 24px;
+		text-align: center;
+		transition: all 0.3s ease;
+		position: relative;
+		overflow: hidden;
+	}
+
+	.agent-card::before {
+		content: '';
+		position: absolute;
+		top: 0;
+		left: 0;
+		right: 0;
+		height: 4px;
+		background: linear-gradient(90deg, #6366f1, #a855f7, #ec4899);
+		transform: scaleX(0);
+		transition: transform 0.3s ease;
+	}
+
+	.agent-card:hover::before {
+		transform: scaleX(1);
+	}
+
+	.agent-card:hover {
+		transform: translateY(-8px);
+		box-shadow: 0 12px 32px rgba(99, 102, 241, 0.2);
+		border-color: var(--accent-secondary);
+	}
+
+	.agent-avatar {
+		width: 120px;
+		height: 120px;
+		margin: 0 auto 24px;
+		border-radius: 50%;
+		overflow: hidden;
+		border: 4px solid var(--border-medium);
+		transition: all 0.3s ease;
+		background: var(--bg-secondary);
+	}
+
+	.agent-card:hover .agent-avatar {
+		border-color: var(--accent-secondary);
+		transform: scale(1.05);
+		box-shadow: 0 8px 24px rgba(99, 102, 241, 0.3);
+	}
+
+	.agent-avatar img {
+		width: 100%;
+		height: 100%;
+		object-fit: cover;
+	}
+
+	.agent-avatar-placeholder {
+		width: 100%;
+		height: 100%;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		background: linear-gradient(135deg, #6366f1, #a855f7);
+		font-size: 3rem;
+	}
+
+	.agent-info {
+		display: flex;
+		flex-direction: column;
+		gap: 8px;
+	}
+
+	.agent-name {
+		font-size: 1.3rem;
+		font-weight: 800;
+		color: var(--text-primary);
+		margin: 0;
+		line-height: 1.2;
+	}
+
+	.agent-title {
+		font-size: 0.9rem;
+		font-weight: 600;
+		color: var(--accent-secondary);
+		text-transform: uppercase;
+		letter-spacing: 0.5px;
+		margin: 0;
+	}
+
+	.agent-description {
+		font-size: 0.95rem;
+		line-height: 1.5;
+		color: var(--text-secondary);
+		margin: 8px 0 0;
+		display: -webkit-box;
+		-webkit-line-clamp: 3;
+		-webkit-box-orient: vertical;
+		overflow: hidden;
+	}
+
 	/* Fade in animation */
 	:global(.fade-in) {
 		animation: fadeIn 0.3s ease-out;
@@ -569,93 +1438,25 @@ const remainingPubs = pubs.slice(featuredPubs.length);
 	}
 
 	@media (max-width: 768px) {
-		.featured-section {
-			margin-bottom: 28px;
-			padding-bottom: 24px;
-		}
-
 		.featured-main .featured-title,
 		.featured-secondary .featured-title {
-			font-size: 1.5rem;
+			font-size: 1.75rem;
 		}
 
 		.featured-main .featured-summary,
 		.featured-secondary .featured-summary {
-			font-size: 0.95rem;
+			font-size: 1rem;
 		}
 
 		.featured-card {
-			padding: 16px;
+			padding: 20px;
 		}
 
-		.featured-category {
-			padding: 4px 12px;
-			font-size: 0.75rem;
-			margin-bottom: 12px;
+		.news-card {
+			padding: 20px;
 		}
 
-		.section-header {
-			flex-direction: column;
-			align-items: flex-start;
-			gap: 8px;
-		}
-
-		.section-title {
-			font-size: 1.4rem;
-		}
-
-		.news-grid {
-			gap: 16px;
-		}
-
-		.card-title {
-			font-size: 1.05rem;
-		}
-
-		.card-summary {
-			font-size: 0.9rem;
-			-webkit-line-clamp: 2;
-		}
-
-		.card-footer {
-			flex-direction: column;
-			align-items: flex-start;
-			gap: 10px;
-		}
-
-		.card-votes {
-			width: 100%;
-			justify-content: flex-start;
-		}
-
-		.vote-btn {
-			width: 36px;
-			height: 36px;
-		}
-	}
-
-	@media (max-width: 480px) {
-		.featured-main .featured-title,
-		.featured-secondary .featured-title {
-			font-size: 1.3rem;
-		}
-
-		.featured-card {
-			padding: 14px;
-		}
-
-		.section-title {
-			font-size: 1.25rem;
-		}
-
-		.card-category {
-			font-size: 0.7rem;
-			padding: 3px 10px;
-		}
-
-		.tag {
-			font-size: 0.7rem;
-			padding: 3px 6px;
-		}
+		.card-footer { flex-direction: column; align-items: flex-start; }
+		.card-header { flex-direction: column; align-items: flex-start; }
 	}
 </style>

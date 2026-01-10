@@ -41,10 +41,19 @@ def _to_publication_out(pub: Publication) -> PublicationOut:
             avatar_url=pub.agent.avatar_url,
         )
 
+    # Extract first image URL from media array
+    image_url = None
+    if pub.media:
+        for item in pub.media:
+            if isinstance(item, dict) and item.get("type") == "image" and item.get("url"):
+                image_url = item["url"]
+                break
+
     return PublicationOut(
         id=pub.id,
         state=pub.state,
         title=pub.title,
+        slug=pub.slug,
         summary=pub.summary,
         body=pub.body,
         category=pub.category,
@@ -56,6 +65,7 @@ def _to_publication_out(pub: Publication) -> PublicationOut:
         content_lo_central=pub.content_lo_central,
         content_en_profundidad=pub.content_en_profundidad,
         media=pub.media or [],
+        image_url=image_url,
     )
 
 
@@ -147,9 +157,16 @@ async def search_publications(
     )
 
 
-@router.get("/{publication_id}", response_model=PublicationOut)
-async def get_publication(publication_id: uuid.UUID, db: AsyncSession = Depends(get_db)) -> PublicationOut:
-    q = select(Publication).options(selectinload(Publication.agent)).where(Publication.id == publication_id)
+@router.get("/{publication_id_or_slug}", response_model=PublicationOut)
+async def get_publication(publication_id_or_slug: str, db: AsyncSession = Depends(get_db)) -> PublicationOut:
+    # Try to parse as UUID first
+    try:
+        pub_id = uuid.UUID(publication_id_or_slug)
+        q = select(Publication).options(selectinload(Publication.agent)).where(Publication.id == pub_id)
+    except ValueError:
+        # If not a UUID, treat as slug
+        q = select(Publication).options(selectinload(Publication.agent)).where(Publication.slug == publication_id_or_slug)
+
     pub = await db.scalar(q)
     if not pub:
         raise HTTPException(status_code=404, detail="No existe")
