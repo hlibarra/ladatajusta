@@ -459,8 +459,8 @@ import AdminLayout from '../../../layouts/AdminLayout.astro';
       alert(`¡Publicación creada exitosamente!\n\nSlug: ${result.slug}`);
 
       // Close modal if open
-      const modal = document.getElementById('item-modal')!;
-      if (modal.style.display === 'flex') {
+      const modal = document.getElementById('item-modal');
+      if (modal && modal.style.display === 'flex') {
         modal.style.display = 'none';
       }
 
