@@ -1,15 +1,6 @@
 ---
 import Layout from '../layouts/Layout.astro';
 
-interface Agent {
-	id: string;
-	name: string;
-	slug: string;
-	description: string;
-	specialization?: string | null;
-	avatar_url?: string | null;
-}
-
 interface Publication {
 	id: string;
 	state: string;
@@ -21,11 +12,11 @@ interface Publication {
 	tags: string[];
 	created_at: string;
 	published_at?: string | null;
-	agent?: Agent | null;
 	content_sin_vueltas?: string | null;
-	content_lo_central?: string | null;
-	content_en_profundidad?: string | null;
 	image_url?: string | null;
+	pulso_informativo?: number | null;
+	is_featured?: boolean;
+	featured_order?: number | null;
 }
 
 interface PaginatedResponse {
@@ -36,20 +27,46 @@ interface PaginatedResponse {
 	has_more: boolean;
 }
 
-const API_BASE = import.meta.env.PUBLIC_API_BASE_URL ?? 'http://localhost:8000';
-const SITE_URL = import.meta.env.SITE ?? 'http://localhost:4321';
+interface DisplayConfig {
+	show_images: boolean;
+}
 
-let pubs: Publication[] = [];
-let total = 0;
+const API_BASE = import.meta.env.PUBLIC_API_BASE_URL ?? 'http://localhost:8000';
+
+let featuredStories: Publication[] = [];
+let recentStories: Publication[] = [];
+let moreStories: Publication[] = [];
 let error = false;
-let agents: Agent[] = [];
+
+// Configuración de display
+let displayConfig: DisplayConfig = { show_images: false };
 
 try {
-	const res = await fetch(`${API_BASE}/api/publications/search?limit=30`);
-	if (res.ok) {
-		const data: PaginatedResponse = await res.json();
-		pubs = data.items;
-		total = data.total;
+	const configRes = await fetch(`${API_BASE}/api/config/display`);
+	if (configRes.ok) {
+		const config = await configRes.json();
+		displayConfig.show_images = config.show_images ?? false;
+	}
+} catch (e) {
+	// usar defaults
+}
+
+// Cargar destacadas y no destacadas en paralelo
+try {
+	const [featuredRes, recentRes] = await Promise.all([
+		fetch(`${API_BASE}/api/publications/featured`),
+		fetch(`${API_BASE}/api/publications/search?limit=20&is_featured=false`)
+	]);
+
+	if (featuredRes.ok) {
+		featuredStories = await featuredRes.json();
+	}
+
+	if (recentRes.ok) {
+		const data: PaginatedResponse = await recentRes.json();
+		const nonFeatured = data.items;
+		recentStories = nonFeatured.slice(0, 6);
+		moreStories = nonFeatured.slice(6, 14);
 	} else {
 		error = true;
 	}
@@ -57,1406 +74,645 @@ try {
 	error = true;
 }
 
-// Obtener agentes
-try {
-	const res = await fetch(`${API_BASE}/api/agents`);
-	if (res.ok) {
-		agents = await res.json();
-	}
-} catch (e) {
-	console.error('Error loading agents:', e);
+const featuredCount = featuredStories.length;
+const totalPubs = featuredStories.length + recentStories.length + moreStories.length;
+
+// Helper para tiempo relativo
+function getTimeAgo(dateString: string): string {
+	const date = new Date(dateString);
+	const now = new Date();
+	const diffMs = now.getTime() - date.getTime();
+	const diffMins = Math.floor(diffMs / 60000);
+	const diffHours = Math.floor(diffMins / 60);
+	const diffDays = Math.floor(diffHours / 24);
+
+	if (diffMins < 60) return `hace ${diffMins} min`;
+	if (diffHours < 24) return `hace ${diffHours}h`;
+	if (diffDays === 1) return 'ayer';
+	if (diffDays < 7) return `hace ${diffDays} días`;
+	return date.toLocaleDateString('es-AR', { day: 'numeric', month: 'short' });
 }
 
-// Separar noticias destacadas
-const featuredPubs = pubs.slice(0, 4); // 4 noticias destacadas
-const remainingPubs = pubs.slice(featuredPubs.length, featuredPubs.length + 8); // Solo 8 noticias (4 filas × 2 columnas)
+// Mapeo de pulso informativo a estado editorial
+function getEditorialState(pulso: number | null | undefined): string | null {
+	if (!pulso) return null;
+	const states: Record<number, string> = {
+		1: 'estabilidad',
+		2: 'incertidumbre',
+		3: 'tensión',
+		4: 'impacto',
+		5: 'cierre'
+	};
+	return states[pulso] || null;
+}
+
+const showImages = displayConfig.show_images;
 ---
 
 <Layout>
 	{error ? (
-		<div class="error-card">
+		<div class="error-state">
 			<p>No se pudo conectar con el servidor.</p>
 		</div>
-	) : pubs.length === 0 ? (
-		<div class="empty-card">
-			<p>Todavia no hay publicaciones.</p>
-			<span class="empty-hint">Usa la API para hacer scraping.</span>
+	) : totalPubs === 0 ? (
+		<div class="empty-state">
+			<p>Sin publicaciones disponibles.</p>
 		</div>
 	) : (
-		<>
-			{/* Noticias destacadas */}
-			{featuredPubs.length > 0 && (
-				<section class="featured-section">
-					<div class="featured-grid">
-						{featuredPubs.map((pub, index) => (
-							<article
-								class:list={['featured-card', index === 0 ? 'featured-main' : 'featured-secondary']}
-								data-id={pub.id}
-							>
-								{pub.image_url && (
-									<div class="featured-image">
-										<img src={pub.image_url} alt={pub.title} loading="lazy" />
-									</div>
+		<main class="editorial-index">
+			{/* Noticias Destacadas - Grid dinámico según cantidad */}
+			{featuredStories.length > 0 && (
+				<section class={`featured-grid featured-${featuredCount}`}>
+					{featuredStories.map((story, index) => (
+						<article class={`featured-story featured-story-${index + 1}`}>
+							<header class="story-meta">
+								{story.category && (
+									<span class="category">{story.category}</span>
 								)}
-								<div class="featured-content">
-									{pub.category && <span class="featured-category">{pub.category}</span>}
-									<a class="featured-title" href={`/p/${pub.slug}`}>{pub.title}</a>
-									<p class="featured-summary">{pub.content_sin_vueltas || pub.summary}</p>
+								{getEditorialState(story.pulso_informativo) && (
+									<span class="editorial-state">{getEditorialState(story.pulso_informativo)}</span>
+								)}
+								<time class="time">{getTimeAgo(story.published_at || story.created_at)}</time>
+							</header>
+							<h2 class="featured-title">
+								<a href={`/p/${story.slug}`}>{story.title}</a>
+							</h2>
+							<p class="featured-summary">{story.content_sin_vueltas || story.summary}</p>
+							{showImages && story.image_url && (
+								<div class="featured-image">
+									<img src={story.image_url} alt="" loading="lazy" />
 								</div>
+							)}
+						</article>
+					))}
+				</section>
+			)}
+
+			{/* Noticias recientes */}
+			{recentStories.length > 0 && (
+				<section class="recent-stories">
+					{recentStories.map((story) => (
+						<article class="story-entry">
+							<header class="story-meta">
+								{story.category && (
+									<span class="category">{story.category}</span>
+								)}
+								{getEditorialState(story.pulso_informativo) && (
+									<span class="editorial-state">{getEditorialState(story.pulso_informativo)}</span>
+								)}
+								<time class="time">{getTimeAgo(story.published_at || story.created_at)}</time>
+							</header>
+							<h2 class="story-title">
+								<a href={`/p/${story.slug}`}>{story.title}</a>
+							</h2>
+							<p class="story-summary">{story.content_sin_vueltas || story.summary}</p>
+						</article>
+					))}
+				</section>
+			)}
+
+			{/* AdSense: In-feed Ad */}
+			{recentStories.length > 0 && (
+				<div class="ad-infeed">
+					<ins class="adsbygoogle"
+						style="display:block"
+						data-ad-client="ca-pub-XXXXXXXXXX"
+						data-ad-slot="XXXXXXXXXX"
+						data-ad-format="fluid"
+						data-ad-layout-key="-6t+ed+2i-1n-4w"></ins>
+					<script is:inline>(adsbygoogle = window.adsbygoogle || []).push({});</script>
+				</div>
+			)}
+
+			{/* En seguimiento */}
+			{moreStories.length > 0 && (
+				<section class="more-stories">
+					<h3 class="section-label">En seguimiento</h3>
+					<div class="stories-list">
+						{moreStories.map((story) => (
+							<article class="compact-entry">
+								<header class="story-meta">
+									{story.category && (
+										<span class="category">{story.category}</span>
+									)}
+									<time class="time">{getTimeAgo(story.published_at || story.created_at)}</time>
+								</header>
+								<h3 class="compact-title">
+									<a href={`/p/${story.slug}`}>{story.title}</a>
+								</h3>
 							</article>
 						))}
 					</div>
 				</section>
 			)}
 
-			{/* Noticias regulares con sidebar de publicidad */}
-			<section class="news-section">
-				<header class="section-header">
-					<h2 class="section-title">Todas las noticias</h2>
-					<span class="section-badge">{total} publicaciones</span>
-				</header>
-
-				<div class="news-with-ads">
-					{/* Columna de noticias (2 columnas) */}
-					<div class="news-grid" id="news-grid">
-						{remainingPubs.map((p) => (
-							<article class="news-card" data-id={p.id}>
-								{/* Imagen de la noticia */}
-								{p.image_url && (
-									<div class="card-image">
-										<img src={p.image_url} alt={p.title} loading="lazy" />
-									</div>
-								)}
-
-								<div class="card-content">
-									{p.category && <span class="card-category">{p.category}</span>}
-									<a class="card-title" href={`/p/${p.slug}`}>{p.title}</a>
-									<p class="card-summary">{p.content_sin_vueltas || p.summary}</p>
-									<footer class="card-footer">
-										<div class="card-tags">
-											{p.tags.slice(0, 2).map((tag) => (
-												<span class="tag">{tag}</span>
-											))}
-										</div>
-										<div class="card-votes">
-											<button class="vote-btn hot" data-type="hot">🔥</button>
-											<button class="vote-btn cold" data-type="cold">❄️</button>
-											<span class="vote-counts"></span>
-										</div>
-									</footer>
-								</div>
-							</article>
-						))}
-					</div>
-
-					{/* Columna de publicidad */}
-					<aside class="ads-sidebar">
-						<div class="ad-block">
-							<span class="ad-label">PUBLICIDAD</span>
-							<div class="ad-content">
-								<p>Espacio publicitario disponible</p>
-							</div>
-						</div>
-						<div class="ad-block">
-							<span class="ad-label">PUBLICIDAD</span>
-							<div class="ad-content">
-								<p>Espacio publicitario disponible</p>
-							</div>
-						</div>
-					</aside>
-				</div>
-			</section>
-
-			{/* Sección de tendencias */}
-			<section class="trending-section">
-				<div class="trending-container">
-					<div class="trending-header">
-						<h2 class="section-title">Tendencias</h2>
-						<span class="trending-badge">🔥 Lo más leído</span>
-					</div>
-					<div class="trending-grid">
-						<article class="trending-item">
-							<span class="trending-number">1</span>
-							<div class="trending-content">
-								<span class="trending-category">POLÍTICA</span>
-								<h3 class="trending-title">Título de la noticia más leída del momento</h3>
-								<span class="trending-views">12.5K lecturas</span>
-							</div>
-						</article>
-						<article class="trending-item">
-							<span class="trending-number">2</span>
-							<div class="trending-content">
-								<span class="trending-category">DEPORTES</span>
-								<h3 class="trending-title">Segunda noticia más popular de hoy</h3>
-								<span class="trending-views">10.2K lecturas</span>
-							</div>
-						</article>
-						<article class="trending-item">
-							<span class="trending-number">3</span>
-							<div class="trending-content">
-								<span class="trending-category">TECNOLOGÍA</span>
-								<h3 class="trending-title">Avances tecnológicos que están cambiando el mundo</h3>
-								<span class="trending-views">8.7K lecturas</span>
-							</div>
-						</article>
-						<article class="trending-item">
-							<span class="trending-number">4</span>
-							<div class="trending-content">
-								<span class="trending-category">ESPECTÁCULOS</span>
-								<h3 class="trending-title">Lo último en el mundo del entretenimiento</h3>
-								<span class="trending-views">7.3K lecturas</span>
-							</div>
-						</article>
-						<article class="trending-item">
-							<span class="trending-number">5</span>
-							<div class="trending-content">
-								<span class="trending-category">ECONOMÍA</span>
-								<h3 class="trending-title">Análisis económico de la semana</h3>
-								<span class="trending-views">6.1K lecturas</span>
-							</div>
-						</article>
-					</div>
-				</div>
-			</section>
-
-			{/* Sección de redes sociales */}
-			<section class="social-section">
-				<div class="social-container">
-					<h2 class="section-title">Síguenos en Redes</h2>
-					<div class="social-grid">
-						<div class="social-block instagram">
-							<div class="social-header">
-								<span class="social-icon">📷</span>
-								<h3>Instagram</h3>
-							</div>
-							<div class="social-content">
-								<p>Contenido de Instagram se mostrará aquí</p>
-								<p class="social-placeholder">Widget de Instagram</p>
-							</div>
-						</div>
-						<div class="social-block twitter">
-							<div class="social-header">
-								<span class="social-icon">🐦</span>
-								<h3>Twitter/X</h3>
-							</div>
-							<div class="social-content">
-								<p>Contenido de Twitter se mostrará aquí</p>
-								<p class="social-placeholder">Widget de Twitter</p>
-							</div>
-						</div>
-						<div class="social-block facebook">
-							<div class="social-header">
-								<span class="social-icon">👍</span>
-								<h3>Facebook</h3>
-							</div>
-							<div class="social-content">
-								<p>Contenido de Facebook se mostrará aquí</p>
-								<p class="social-placeholder">Widget de Facebook</p>
-							</div>
-						</div>
-					</div>
-				</div>
-			</section>
-
-			{/* Sección de agentes */}
-			{agents.length > 0 && (
-				<section class="agents-section">
-					<div class="agents-container">
-						<h2 class="section-title">Nuestros Agentes IA</h2>
-						<p class="agents-subtitle">Conoce a los agentes de inteligencia artificial que crean contenido para LaDataJusta</p>
-						<div class="agents-grid">
-							{agents.map((agent) => (
-								<article class="agent-card">
-									<div class="agent-avatar">
-										{agent.avatar_url ? (
-											<img src={agent.avatar_url} alt={agent.name} />
-										) : (
-											<div class="agent-avatar-placeholder">
-												<span>🤖</span>
-											</div>
-										)}
-									</div>
-									<div class="agent-info">
-										<h3 class="agent-name">{agent.name}</h3>
-										<p class="agent-title">{agent.specialization || 'Agente IA'}</p>
-										<p class="agent-description">{agent.description}</p>
-									</div>
-								</article>
-							))}
-						</div>
-					</div>
-				</section>
-			)}
-		</>
+		</main>
 	)}
 </Layout>
 
-<script>
-	// Use client-specific API URL for browser requests
-	const API_BASE = import.meta.env.PUBLIC_CLIENT_API_BASE_URL ?? import.meta.env.PUBLIC_API_BASE_URL ?? 'http://localhost:8000';
-	const SITE_URL = import.meta.env.SITE ?? 'http://localhost:4321';
-
-	console.log('API_BASE configured as:', API_BASE);
-
-	let currentOffset = 30;
-	let isLoading = false;
-	let hasMore = true;
-	let currentFilters: Record<string, string> = {};
-
-	// Voting
-	function setupVoting(container: Element) {
-		container.querySelectorAll('article.news-card, article.featured-card').forEach((card) => {
-			const id = card.getAttribute('data-id');
-			if (!id) return;
-			const countsEl = card.querySelector('.vote-counts');
-			card.querySelectorAll('button.vote-btn').forEach((btn) => {
-				btn.addEventListener('click', async (e) => {
-					e.preventDefault();
-					const voteType = btn.getAttribute('data-type');
-					if (!voteType) return;
-					try {
-						const url = `${API_BASE}/api/publications/${id}/vote`;
-						console.log('Voting to URL:', url);
-						const r = await fetch(url, {
-							method: 'POST',
-							headers: { 'content-type': 'application/json' },
-							body: JSON.stringify({ vote_type: voteType }),
-						});
-						if (!r.ok) throw new Error(String(r.status));
-						const data = await r.json();
-						if (countsEl) countsEl.textContent = `Alta ${data.hot} - Fria ${data.cold}`;
-					} catch (e) {
-						if (countsEl) countsEl.textContent = 'Error';
-					}
-				});
-			});
-		});
-	}
-
-	// Create news card HTML
-	function createCardHTML(p: any): string {
-		const image = p.image_url ? `
-			<div class="card-image">
-				<img src="${p.image_url}" alt="${p.title}" loading="lazy" />
-			</div>
-		` : '';
-		const category = p.category ? `<span class="card-category">${p.category}</span>` : '';
-		const tags = p.tags.slice(0, 2).map((tag: string) => `<span class="tag">${tag}</span>`).join('');
-		const summary = p.content_sin_vueltas || p.summary;
-
-		return `
-			<article class="news-card" data-id="${p.id}">
-				${image}
-				<div class="card-content">
-					${category}
-					<a class="card-title" href="/p/${p.slug}">${p.title}</a>
-					<p class="card-summary">${summary}</p>
-					<footer class="card-footer">
-						<div class="card-tags">${tags}</div>
-						<div class="card-votes">
-							<button class="vote-btn hot" data-type="hot">🔥</button>
-							<button class="vote-btn cold" data-type="cold">❄️</button>
-							<span class="vote-counts"></span>
-						</div>
-					</footer>
-				</div>
-			</article>
-		`;
-	}
-
-	// Load more publications
-	async function loadMore() {
-		if (isLoading || !hasMore) return;
-		isLoading = true;
-
-		const loadingIndicator = document.getElementById('loading-indicator');
-		if (loadingIndicator) loadingIndicator.style.display = 'block';
-
-		try {
-			const params = new URLSearchParams({
-				limit: '20',
-				offset: String(currentOffset),
-				...currentFilters,
-			});
-
-			const r = await fetch(`${API_BASE}/api/publications/search?${params}`);
-			if (!r.ok) throw new Error(String(r.status));
-
-			const data = await r.json();
-			const grid = document.getElementById('news-grid');
-
-			if (grid && data.items.length > 0) {
-				const fragment = document.createDocumentFragment();
-				const tempDiv = document.createElement('div');
-
-				data.items.forEach((p: any) => {
-					tempDiv.innerHTML = createCardHTML(p);
-					const card = tempDiv.firstElementChild;
-					if (card) {
-						card.classList.add('fade-in');
-						fragment.appendChild(card);
-					}
-				});
-
-				grid.appendChild(fragment);
-				setupVoting(grid);
-
-				currentOffset += data.items.length;
-				hasMore = data.has_more;
-			} else {
-				hasMore = false;
-			}
-
-			if (!hasMore) {
-				const container = document.getElementById('load-more-container');
-				if (container) container.style.display = 'none';
-			}
-		} catch (e) {
-			console.error('Error loading more:', e);
-		} finally {
-			isLoading = false;
-			if (loadingIndicator) loadingIndicator.style.display = 'none';
-		}
-	}
-
-	// Initialize
-	document.addEventListener('DOMContentLoaded', () => {
-		const grid = document.getElementById('news-grid');
-		if (grid) {
-			setupVoting(grid);
-		}
-
-		// Infinite scroll
-		const scrollTrigger = document.getElementById('scroll-trigger');
-		if (scrollTrigger) {
-			const observer = new IntersectionObserver(
-				(entries) => {
-					if (entries[0].isIntersecting) {
-						loadMore();
-					}
-				},
-				{ rootMargin: '200px' }
-			);
-			observer.observe(scrollTrigger);
-		}
-	});
-</script>
-
 <style>
-	/* Featured Section - Noticias destacadas */
-	.featured-section {
-		margin-bottom: 40px;
-		padding-bottom: 32px;
-		border-bottom: 2px solid var(--border-subtle);
+	/* ===== RESET Y BASE ===== */
+	.editorial-index {
+		max-width: 720px;
+		margin: 0 auto;
+		padding: 0 20px;
 	}
 
+	@media (min-width: 900px) {
+		.editorial-index {
+			max-width: 1100px;
+			padding: 0 40px;
+		}
+	}
+
+	/* ===== ESTADOS ===== */
+	.error-state,
+	.empty-state {
+		text-align: center;
+		padding: 80px 20px;
+		color: var(--text-muted);
+		font-size: 0.95rem;
+	}
+
+	/* ===== NOTICIAS DESTACADAS - GRID DINÁMICO ===== */
 	.featured-grid {
-		display: grid;
-		gap: 24px;
-		grid-template-columns: 1fr;
+		padding: 48px 0 56px;
+		border-bottom: 1px solid var(--border-subtle);
 	}
 
-	/* Layout: 1 noticia grande + 3 pequeñas */
-	@media (min-width: 768px) {
-		.featured-grid {
-			grid-template-columns: repeat(2, 1fr);
-			grid-template-rows: repeat(2, 1fr);
-		}
-
-		/* La primera noticia ocupa 2 filas */
-		.featured-grid .featured-card:first-child {
-			grid-row: 1 / 3;
-		}
+	.featured-story {
+		border-left: 3px solid var(--accent-main, #6366f1);
+		padding-left: 24px;
 	}
 
-	@media (min-width: 1024px) {
-		.featured-grid {
-			grid-template-columns: 2fr 1fr 1fr;
-			grid-template-rows: auto auto;
-		}
-
-		/* La primera noticia ocupa 2 filas */
-		.featured-grid .featured-card:first-child {
-			grid-row: 1 / 3;
-			grid-column: 1;
-		}
-
-		/* Las otras 3 se distribuyen a la derecha */
-		.featured-grid .featured-card:nth-child(2) {
-			grid-column: 2;
-			grid-row: 1;
-		}
-
-		.featured-grid .featured-card:nth-child(3) {
-			grid-column: 3;
-			grid-row: 1;
-		}
-
-		.featured-grid .featured-card:nth-child(4) {
-			grid-column: 2 / 4;
-			grid-row: 2;
-		}
+	.featured-title {
+		font-weight: 700;
+		line-height: 1.15;
+		letter-spacing: -0.02em;
+		margin: 0 0 16px;
+		color: var(--text-primary);
 	}
 
-	.featured-card {
-		background: var(--bg-card);
-		border: 1px solid var(--border-medium);
-		border-radius: var(--radius-lg);
+	.featured-title a {
+		color: inherit;
+		text-decoration: none;
+	}
+
+	.featured-title a:hover {
+		color: var(--text-secondary);
+	}
+
+	.featured-summary {
+		line-height: 1.6;
+		color: var(--text-secondary);
+		margin: 0;
+		display: -webkit-box;
+		-webkit-box-orient: vertical;
 		overflow: hidden;
-		transition: all 0.3s ease;
-		display: flex;
-		flex-direction: column;
-	}
-
-	.featured-card:hover {
-		border-color: var(--accent-primary);
-		box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
 	}
 
 	.featured-image {
-		width: 100%;
-		overflow: hidden;
-		background: var(--bg-secondary);
-	}
-
-	.featured-main .featured-image {
-		height: 400px;
-	}
-
-	.featured-secondary .featured-image {
-		height: 200px;
+		margin-top: 20px;
 	}
 
 	.featured-image img {
 		width: 100%;
-		height: 100%;
-		object-fit: cover;
-		transition: transform 0.3s ease;
-	}
-
-	.featured-card:hover .featured-image img {
-		transform: scale(1.05);
-	}
-
-	.featured-content {
-		padding: 28px;
-		flex: 1;
-		display: flex;
-		flex-direction: column;
-	}
-
-	/* La primera noticia es más grande */
-	.featured-main .featured-title {
-		font-size: 2.5rem;
-	}
-
-	.featured-main .featured-summary {
-		font-size: 1.2rem;
-	}
-
-	/* Noticias secundarias son más compactas */
-	.featured-secondary .featured-title {
-		font-size: 1.75rem;
-	}
-
-	.featured-secondary .featured-summary {
-		font-size: 1rem;
-		display: -webkit-box;
-		-webkit-line-clamp: 3;
-		-webkit-box-orient: vertical;
-		overflow: hidden;
-	}
-
-	.featured-category {
-		display: inline-block;
-		padding: 6px 16px;
-		background: var(--accent-primary);
-		color: white;
-		border-radius: var(--radius-sm);
-		font-size: 0.85rem;
-		font-weight: 600;
-		text-transform: uppercase;
-		letter-spacing: 0.5px;
-		margin-bottom: 16px;
-	}
-
-	.featured-title {
+		height: auto;
 		display: block;
-		font-size: 2.5rem;
-		font-weight: 900;
-		line-height: 1.2;
-		color: var(--text-primary);
-		margin-bottom: 16px;
-		letter-spacing: -0.5px;
+		border-radius: 4px;
 	}
 
-	.featured-title:hover {
-		color: var(--accent-secondary);
+	/* === 1 DESTACADA: Grande, full width === */
+	.featured-1 .featured-story {
+		max-width: 720px;
 	}
 
-	.featured-summary {
-		font-size: 1.2rem;
-		line-height: 1.6;
-		color: var(--text-secondary);
-		margin: 0;
+	.featured-1 .featured-title {
+		font-size: clamp(1.875rem, 5vw, 2.75rem);
 	}
 
-	/* News Section */
-	.news-section { margin-bottom: 48px; }
-	.section-header {
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		gap: 12px;
-		margin-bottom: 24px;
-		padding-bottom: 12px;
-		border-bottom: 1px solid var(--border-subtle);
-	}
-	.section-title {
-		margin: 0;
-		font-size: 1.75rem;
-		font-weight: 800;
-		letter-spacing: -0.5px;
-	}
-	.section-badge {
-		padding: 6px 12px;
-		background: var(--bg-secondary);
-		border: 1px solid var(--border-subtle);
-		border-radius: var(--radius-md);
-		font-size: 0.85rem;
-		color: var(--text-secondary);
-		font-weight: 500;
+	.featured-1 .featured-summary {
+		font-size: 1.15rem;
+		-webkit-line-clamp: 4;
 	}
 
-	.error-card, .empty-card {
-		padding: 48px;
-		background: var(--bg-card);
-		border: 1px solid var(--border-subtle);
-		border-radius: var(--radius-lg);
-		text-align: center;
-	}
-	.error-card p, .empty-card p { margin: 0 0 8px; color: var(--text-secondary); }
-	.empty-hint { font-size: 0.9rem; color: var(--text-muted); }
-
-	/* Layout: 2 columnas de noticias + 1 columna de ads */
-	.news-with-ads {
-		display: grid;
-		gap: 32px;
-		grid-template-columns: 1fr;
-	}
-
-	@media (min-width: 1024px) {
-		.news-with-ads {
-			grid-template-columns: 1fr 300px;
-		}
-	}
-
-	/* Grid de noticias: 2 columnas en desktop, 1 en mobile */
-	.news-grid {
-		display: grid;
-		gap: 24px;
-		grid-template-columns: 1fr;
-	}
-
+	/* === 2 DESTACADAS: Dos columnas iguales === */
 	@media (min-width: 768px) {
-		.news-grid {
-			grid-template-columns: repeat(2, 1fr);
+		.featured-2 {
+			display: grid;
+			grid-template-columns: 1fr 1fr;
+			gap: 48px;
 		}
 	}
 
-	/* News cards */
-	.news-card {
-		background: var(--bg-card);
-		border: 1px solid var(--border-medium);
-		border-radius: var(--radius-lg);
-		overflow: hidden;
-		transition: all 0.2s ease;
-		display: flex;
-		flex-direction: column;
+	.featured-2 .featured-title {
+		font-size: clamp(1.25rem, 3vw, 1.75rem);
 	}
 
-	.news-card:hover {
-		border-color: var(--accent-primary);
-		box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
-	}
-
-	.card-image {
-		width: 100%;
-		height: 200px;
-		overflow: hidden;
-		background: var(--bg-secondary);
-	}
-
-	.card-image img {
-		width: 100%;
-		height: 100%;
-		object-fit: cover;
-		transition: transform 0.3s ease;
-	}
-
-	.news-card:hover .card-image img {
-		transform: scale(1.05);
-	}
-
-	.card-content {
-		padding: 24px;
-		flex: 1;
-		display: flex;
-		flex-direction: column;
-	}
-
-	.card-category {
-		display: inline-block;
-		padding: 4px 12px;
-		background: rgba(59, 130, 246, 0.1);
-		border-left: 3px solid var(--accent-secondary);
-		font-size: 0.75rem;
-		color: var(--accent-secondary);
-		font-weight: 600;
-		text-transform: uppercase;
-		letter-spacing: 0.5px;
-		margin-bottom: 12px;
-	}
-
-	.card-title {
-		display: block;
-		font-size: 1.25rem;
-		font-weight: 700;
-		color: var(--text-primary);
-		margin-bottom: 12px;
-		line-height: 1.4;
-		transition: color 0.2s;
-	}
-
-	.card-title:hover {
-		color: var(--accent-secondary);
-	}
-
-	.card-summary {
-		margin: 0 0 16px;
-		color: var(--text-secondary);
-		line-height: 1.6;
+	.featured-2 .featured-summary {
 		font-size: 0.95rem;
-		display: -webkit-box;
 		-webkit-line-clamp: 3;
-		-webkit-box-orient: vertical;
-		overflow: hidden;
 	}
 
-	.card-footer {
+	/* === 3 DESTACADAS: 1 grande + 2 pequeñas === */
+	@media (min-width: 768px) {
+		.featured-3 {
+			display: grid;
+			grid-template-columns: 1.2fr 1fr;
+			grid-template-rows: auto auto;
+			gap: 32px 48px;
+		}
+
+		.featured-3 .featured-story-1 {
+			grid-row: span 2;
+		}
+
+		.featured-3 .featured-story-2,
+		.featured-3 .featured-story-3 {
+			border-left-width: 2px;
+			padding-left: 20px;
+		}
+	}
+
+	.featured-3 .featured-story-1 .featured-title {
+		font-size: clamp(1.5rem, 4vw, 2.25rem);
+	}
+
+	.featured-3 .featured-story-1 .featured-summary {
+		font-size: 1.05rem;
+		-webkit-line-clamp: 5;
+	}
+
+	.featured-3 .featured-story-2 .featured-title,
+	.featured-3 .featured-story-3 .featured-title {
+		font-size: clamp(1.1rem, 2.5vw, 1.35rem);
+	}
+
+	.featured-3 .featured-story-2 .featured-summary,
+	.featured-3 .featured-story-3 .featured-summary {
+		font-size: 0.9rem;
+		-webkit-line-clamp: 2;
+	}
+
+	/* === 4 DESTACADAS: Grid 2x2 === */
+	@media (min-width: 768px) {
+		.featured-4 {
+			display: grid;
+			grid-template-columns: 1fr 1fr;
+			gap: 40px 48px;
+		}
+	}
+
+	.featured-4 .featured-story {
+		border-left-width: 2px;
+		padding-left: 20px;
+	}
+
+	.featured-4 .featured-title {
+		font-size: clamp(1.1rem, 2.5vw, 1.4rem);
+	}
+
+	.featured-4 .featured-summary {
+		font-size: 0.9rem;
+		-webkit-line-clamp: 2;
+	}
+
+	/* Mobile: todas las destacadas en columna */
+	@media (max-width: 767px) {
+		.featured-grid {
+			display: flex;
+			flex-direction: column;
+			gap: 32px;
+		}
+
+		.featured-story {
+			padding-left: 16px;
+			border-left-width: 2px;
+		}
+
+		.featured-title {
+			font-size: 1.25rem;
+		}
+
+		.featured-summary {
+			font-size: 0.9rem;
+			-webkit-line-clamp: 3;
+		}
+	}
+
+	/* ===== METADATOS DE NOTICIA ===== */
+	.story-meta {
 		display: flex;
-		justify-content: space-between;
-		align-items: center;
-		gap: 12px;
-		padding-top: 12px;
-		border-top: 1px solid var(--border-subtle);
-	}
-
-	.card-tags {
-		display: flex;
-		gap: 6px;
-		flex-wrap: wrap;
-		flex: 1;
-	}
-
-	.tag {
-		padding: 4px 8px;
-		background: var(--bg-secondary);
-		border-radius: var(--radius-sm);
-		font-size: 0.75rem;
-		color: var(--text-muted);
-		white-space: nowrap;
-	}
-
-	.card-votes {
-		display: flex;
-		align-items: center;
-		gap: 6px;
-		flex-shrink: 0;
-	}
-
-	.vote-btn {
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		width: 32px;
-		height: 32px;
-		background: var(--bg-secondary);
-		border: 1px solid var(--border-subtle);
-		border-radius: var(--radius-md);
-		cursor: pointer;
-		transition: all 0.2s;
-		font-size: 1rem;
-	}
-
-	.vote-btn:hover {
-		background: var(--bg-card-hover);
-		border-color: var(--border-medium);
-		transform: scale(1.1);
-	}
-
-	.vote-btn.hot:hover {
-		border-color: #f59e0b;
-		background: rgba(245, 158, 11, 0.1);
-	}
-
-	.vote-btn.cold:hover {
-		border-color: #3b82f6;
-		background: rgba(59, 130, 246, 0.1);
-	}
-
-	.vote-counts {
+		align-items: baseline;
+		gap: 0;
+		margin-bottom: 12px;
 		font-size: 0.8rem;
 		color: var(--text-muted);
-		white-space: nowrap;
 	}
 
-	/* Ads Sidebar */
-	.ads-sidebar {
-		display: flex;
-		flex-direction: column;
-		gap: 24px;
+	.category {
+		color: var(--accent-muted, #64748b);
+		font-weight: 500;
+		text-transform: lowercase;
 	}
 
-	@media (min-width: 1024px) {
-		.ads-sidebar {
-			position: sticky;
-			top: 80px;
-			height: fit-content;
+	.category::after {
+		content: '·';
+		margin: 0 10px;
+		color: var(--text-muted);
+		opacity: 0.5;
+	}
+
+	.editorial-state {
+		color: var(--text-muted);
+	}
+
+	.editorial-state::after {
+		content: '·';
+		margin: 0 10px;
+		opacity: 0.5;
+	}
+
+	.time {
+		color: var(--text-muted);
+		opacity: 0.8;
+	}
+
+	/* ===== NOTICIAS RECIENTES ===== */
+	.recent-stories {
+		padding: 56px 0;
+	}
+
+	/* Desktop: dos columnas */
+	@media (min-width: 900px) {
+		.recent-stories {
+			display: grid;
+			grid-template-columns: 1fr 1fr;
+			gap: 0 48px;
 		}
 	}
 
-	.ad-block {
-		background: var(--bg-card);
-		border: 2px dashed var(--border-medium);
-		border-radius: var(--radius-lg);
-		overflow: hidden;
-	}
-
-	.ad-label {
-		display: block;
-		padding: 8px 12px;
-		background: var(--bg-secondary);
-		font-size: 0.7rem;
-		font-weight: 600;
-		color: var(--text-muted);
-		text-align: center;
-		letter-spacing: 1px;
-	}
-
-	.ad-content {
-		padding: 60px 20px;
-		text-align: center;
-		background: var(--bg-card);
-		min-height: 250px;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-	}
-
-	.ad-content p {
-		margin: 0;
-		color: var(--text-muted);
-		font-size: 0.9rem;
-	}
-
-	/* Full Width Section - Sección de una columna */
-	.full-width-section {
-		margin: 48px 0;
-		padding: 48px 0;
-		background: var(--bg-secondary);
-		border-top: 1px solid var(--border-subtle);
+	.story-entry {
+		padding: 40px 0;
 		border-bottom: 1px solid var(--border-subtle);
+		border-left: 2px solid transparent;
+		padding-left: 20px;
+		margin-left: -20px;
+		transition: border-color 0.2s ease;
 	}
 
-	.full-width-container {
-		max-width: 1200px;
-		margin: 0 auto;
-		padding: 0 24px;
+	.story-entry:hover {
+		border-left-color: var(--accent-recent, #10b981);
 	}
 
-	.full-width-content {
-		background: var(--bg-card);
-		border: 1px solid var(--border-medium);
-		border-radius: var(--radius-lg);
-		padding: 40px;
-		margin-top: 24px;
+	.story-entry:first-child {
+		padding-top: 0;
 	}
 
-	.full-width-content p {
-		margin: 0;
-		color: var(--text-secondary);
-		line-height: 1.8;
-		font-size: 1.1rem;
+	.story-entry:last-child {
+		border-bottom: none;
+		padding-bottom: 0;
 	}
 
-	/* Magazine Section - Estilo revista: 1 grande + 4 pequeñas */
-	.magazine-section {
-		margin: 48px 0;
-		padding: 48px 0;
-		background: var(--bg-card);
-	}
+	/* En grid de 2 columnas, ajustar los primeros dos */
+	@media (min-width: 900px) {
+		.story-entry:first-child,
+		.story-entry:nth-child(2) {
+			padding-top: 0;
+		}
 
-	.magazine-container {
-		max-width: 1200px;
-		margin: 0 auto;
-		padding: 0 24px;
-	}
+		.story-entry:last-child,
+		.story-entry:nth-last-child(2):nth-child(odd) {
+			border-bottom: none;
+			padding-bottom: 0;
+		}
 
-	.magazine-layout {
-		display: grid;
-		gap: 24px;
-		grid-template-columns: 1fr;
-	}
-
-	@media (min-width: 1024px) {
-		.magazine-layout {
-			grid-template-columns: 1.2fr 1fr;
+		/* Si hay número impar, el último de la izquierda también sin borde */
+		.story-entry:nth-last-child(2):nth-child(odd) {
+			border-bottom: none;
 		}
 	}
 
-	/* Noticia principal grande */
-	.magazine-main {
-		background: var(--bg-card);
-		border: 1px solid var(--border-medium);
-		border-radius: var(--radius-lg);
-		overflow: hidden;
-		transition: all 0.3s ease;
-	}
-
-	.magazine-main:hover {
-		box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
-		transform: translateY(-2px);
-	}
-
-	.magazine-main-image {
-		width: 100%;
-		height: 400px;
-		overflow: hidden;
-		background: var(--bg-secondary);
-	}
-
-	.magazine-main-image img {
-		width: 100%;
-		height: 100%;
-		object-fit: cover;
-		transition: transform 0.3s ease;
-	}
-
-	.magazine-main:hover .magazine-main-image img {
-		transform: scale(1.05);
-	}
-
-	.magazine-main-content {
-		padding: 32px;
-	}
-
-	.magazine-date {
-		display: inline-block;
-		font-size: 0.85rem;
-		color: var(--text-muted);
-		margin-bottom: 8px;
-	}
-
-	.magazine-category {
-		display: inline-block;
-		padding: 4px 12px;
-		background: var(--accent-primary);
-		color: white;
-		font-size: 0.7rem;
-		font-weight: 700;
-		text-transform: uppercase;
-		letter-spacing: 0.5px;
-		border-radius: var(--radius-sm);
-		margin-left: 12px;
-	}
-
-	.magazine-main-title {
-		font-size: 1.8rem;
-		font-weight: 800;
-		line-height: 1.2;
+	.story-title {
+		font-size: 1.3rem;
+		font-weight: 600;
+		line-height: 1.3;
+		letter-spacing: -0.01em;
+		margin: 0 0 12px;
 		color: var(--text-primary);
-		margin: 16px 0 12px;
 	}
 
-	.magazine-main-summary {
-		font-size: 1rem;
+	.story-title a {
+		color: inherit;
+		text-decoration: none;
+	}
+
+	.story-title a:hover {
+		color: var(--text-secondary);
+	}
+
+	.story-summary {
+		font-size: 0.975rem;
 		line-height: 1.6;
 		color: var(--text-secondary);
 		margin: 0;
-	}
-
-	/* Noticias pequeñas del sidebar */
-	.magazine-sidebar {
-		display: grid;
-		gap: 16px;
-		grid-template-columns: 1fr;
-	}
-
-	@media (min-width: 768px) and (max-width: 1023px) {
-		.magazine-sidebar {
-			grid-template-columns: repeat(2, 1fr);
-		}
-	}
-
-	.magazine-small {
-		background: var(--bg-card);
-		border: 1px solid var(--border-medium);
-		border-radius: var(--radius-lg);
-		overflow: hidden;
-		transition: all 0.2s ease;
-	}
-
-	.magazine-small:hover {
-		border-color: var(--accent-primary);
-		box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-	}
-
-	.magazine-small-image {
-		width: 100%;
-		height: 160px;
-		overflow: hidden;
-		background: var(--bg-secondary);
-	}
-
-	.magazine-small-image img {
-		width: 100%;
-		height: 100%;
-		object-fit: cover;
-		transition: transform 0.3s ease;
-	}
-
-	.magazine-small:hover .magazine-small-image img {
-		transform: scale(1.05);
-	}
-
-	.magazine-small-content {
-		padding: 16px;
-	}
-
-	.magazine-small-category {
-		display: inline-block;
-		font-size: 0.65rem;
-		font-weight: 700;
-		color: var(--accent-secondary);
-		text-transform: uppercase;
-		letter-spacing: 0.5px;
-		margin-bottom: 8px;
-	}
-
-	.magazine-small-title {
-		font-size: 0.95rem;
-		font-weight: 700;
-		line-height: 1.3;
-		color: var(--text-primary);
-		margin: 0;
-	}
-
-	/* Trending Section - Tendencias */
-	.trending-section {
-		margin: 48px 0;
-		padding: 48px 0;
-		background: linear-gradient(135deg, rgba(230, 57, 70, 0.05) 0%, rgba(59, 130, 246, 0.05) 100%);
-	}
-
-	.trending-container {
-		max-width: 1200px;
-		margin: 0 auto;
-		padding: 0 24px;
-	}
-
-	.trending-header {
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		margin-bottom: 32px;
-		flex-wrap: wrap;
-		gap: 12px;
-	}
-
-	.trending-badge {
-		padding: 8px 16px;
-		background: linear-gradient(135deg, #ff6b6b, #ee5a6f);
-		color: white;
-		border-radius: var(--radius-md);
-		font-size: 0.9rem;
-		font-weight: 600;
-		box-shadow: 0 4px 12px rgba(230, 57, 70, 0.3);
-	}
-
-	.trending-grid {
-		display: grid;
-		gap: 16px;
-		grid-template-columns: 1fr;
-	}
-
-	@media (min-width: 768px) {
-		.trending-grid {
-			grid-template-columns: repeat(2, 1fr);
-		}
-	}
-
-	@media (min-width: 1024px) {
-		.trending-grid {
-			grid-template-columns: repeat(5, 1fr);
-		}
-	}
-
-	.trending-item {
-		background: var(--bg-card);
-		border: 1px solid var(--border-medium);
-		border-radius: var(--radius-lg);
-		padding: 20px;
-		display: flex;
-		gap: 16px;
-		align-items: flex-start;
-		transition: all 0.3s ease;
-	}
-
-	.trending-item:hover {
-		transform: translateY(-4px);
-		box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
-		border-color: var(--accent-primary);
-	}
-
-	.trending-number {
-		flex-shrink: 0;
-		width: 40px;
-		height: 40px;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
-		color: white;
-		font-size: 1.2rem;
-		font-weight: 900;
-		border-radius: 50%;
-		box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-	}
-
-	.trending-content {
-		flex: 1;
-		min-width: 0;
-	}
-
-	.trending-category {
-		display: inline-block;
-		font-size: 0.65rem;
-		font-weight: 700;
-		color: var(--accent-secondary);
-		text-transform: uppercase;
-		letter-spacing: 0.5px;
-		margin-bottom: 6px;
-	}
-
-	.trending-title {
-		font-size: 0.95rem;
-		font-weight: 700;
-		line-height: 1.3;
-		color: var(--text-primary);
-		margin: 0 0 8px;
-		display: -webkit-box;
-		-webkit-line-clamp: 2;
-		-webkit-box-orient: vertical;
-		overflow: hidden;
-	}
-
-	.trending-views {
-		font-size: 0.75rem;
-		color: var(--text-muted);
-		font-weight: 500;
-	}
-
-	/* Social Section - Redes Sociales */
-	.social-section {
-		margin: 48px 0;
-		padding: 48px 0;
-	}
-
-	.social-container {
-		max-width: 1200px;
-		margin: 0 auto;
-		padding: 0 24px;
-	}
-
-	.social-grid {
-		display: grid;
-		gap: 24px;
-		grid-template-columns: 1fr;
-		margin-top: 24px;
-	}
-
-	@media (min-width: 768px) {
-		.social-grid {
-			grid-template-columns: repeat(2, 1fr);
-		}
-	}
-
-	@media (min-width: 1024px) {
-		.social-grid {
-			grid-template-columns: repeat(3, 1fr);
-		}
-	}
-
-	.social-block {
-		background: var(--bg-card);
-		border: 1px solid var(--border-medium);
-		border-radius: var(--radius-lg);
-		overflow: hidden;
-		transition: all 0.3s ease;
-	}
-
-	.social-block:hover {
-		transform: translateY(-4px);
-		box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
-	}
-
-	.social-block.instagram {
-		border-top: 4px solid #E1306C;
-	}
-
-	.social-block.twitter {
-		border-top: 4px solid #1DA1F2;
-	}
-
-	.social-block.facebook {
-		border-top: 4px solid #4267B2;
-	}
-
-	.social-header {
-		display: flex;
-		align-items: center;
-		gap: 12px;
-		padding: 20px 24px;
-		border-bottom: 1px solid var(--border-subtle);
-		background: var(--bg-secondary);
-	}
-
-	.social-icon {
-		font-size: 1.5rem;
-	}
-
-	.social-header h3 {
-		margin: 0;
-		font-size: 1.1rem;
-		font-weight: 700;
-		color: var(--text-primary);
-	}
-
-	.social-content {
-		padding: 32px 24px;
-		text-align: center;
-		min-height: 300px;
-		display: flex;
-		flex-direction: column;
-		align-items: center;
-		justify-content: center;
-		gap: 12px;
-	}
-
-	.social-content p {
-		margin: 0;
-		color: var(--text-secondary);
-	}
-
-	.social-placeholder {
-		padding: 16px 24px;
-		background: var(--bg-secondary);
-		border: 2px dashed var(--border-medium);
-		border-radius: var(--radius-md);
-		color: var(--text-muted);
-		font-size: 0.9rem;
-		font-weight: 500;
-	}
-
-	/* Agents Section - Agentes IA */
-	.agents-section {
-		margin: 48px 0;
-		padding: 64px 0;
-		background: linear-gradient(135deg, rgba(99, 102, 241, 0.05) 0%, rgba(168, 85, 247, 0.05) 100%);
-		border-top: 2px solid var(--border-subtle);
-	}
-
-	.agents-container {
-		max-width: 1200px;
-		margin: 0 auto;
-		padding: 0 24px;
-	}
-
-	.agents-subtitle {
-		text-align: center;
-		color: var(--text-secondary);
-		font-size: 1.1rem;
-		margin: 12px 0 48px;
-		max-width: 600px;
-		margin-left: auto;
-		margin-right: auto;
-	}
-
-	.agents-grid {
-		display: grid;
-		gap: 32px;
-		grid-template-columns: 1fr;
-	}
-
-	@media (min-width: 640px) {
-		.agents-grid {
-			grid-template-columns: repeat(2, 1fr);
-		}
-	}
-
-	@media (min-width: 1024px) {
-		.agents-grid {
-			grid-template-columns: repeat(3, 1fr);
-		}
-	}
-
-	@media (min-width: 1280px) {
-		.agents-grid {
-			grid-template-columns: repeat(4, 1fr);
-		}
-	}
-
-	.agent-card {
-		background: var(--bg-card);
-		border: 2px solid var(--border-medium);
-		border-radius: var(--radius-lg);
-		padding: 32px 24px;
-		text-align: center;
-		transition: all 0.3s ease;
-		position: relative;
-		overflow: hidden;
-	}
-
-	.agent-card::before {
-		content: '';
-		position: absolute;
-		top: 0;
-		left: 0;
-		right: 0;
-		height: 4px;
-		background: linear-gradient(90deg, #6366f1, #a855f7, #ec4899);
-		transform: scaleX(0);
-		transition: transform 0.3s ease;
-	}
-
-	.agent-card:hover::before {
-		transform: scaleX(1);
-	}
-
-	.agent-card:hover {
-		transform: translateY(-8px);
-		box-shadow: 0 12px 32px rgba(99, 102, 241, 0.2);
-		border-color: var(--accent-secondary);
-	}
-
-	.agent-avatar {
-		width: 120px;
-		height: 120px;
-		margin: 0 auto 24px;
-		border-radius: 50%;
-		overflow: hidden;
-		border: 4px solid var(--border-medium);
-		transition: all 0.3s ease;
-		background: var(--bg-secondary);
-	}
-
-	.agent-card:hover .agent-avatar {
-		border-color: var(--accent-secondary);
-		transform: scale(1.05);
-		box-shadow: 0 8px 24px rgba(99, 102, 241, 0.3);
-	}
-
-	.agent-avatar img {
-		width: 100%;
-		height: 100%;
-		object-fit: cover;
-	}
-
-	.agent-avatar-placeholder {
-		width: 100%;
-		height: 100%;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		background: linear-gradient(135deg, #6366f1, #a855f7);
-		font-size: 3rem;
-	}
-
-	.agent-info {
-		display: flex;
-		flex-direction: column;
-		gap: 8px;
-	}
-
-	.agent-name {
-		font-size: 1.3rem;
-		font-weight: 800;
-		color: var(--text-primary);
-		margin: 0;
-		line-height: 1.2;
-	}
-
-	.agent-title {
-		font-size: 0.9rem;
-		font-weight: 600;
-		color: var(--accent-secondary);
-		text-transform: uppercase;
-		letter-spacing: 0.5px;
-		margin: 0;
-	}
-
-	.agent-description {
-		font-size: 0.95rem;
-		line-height: 1.5;
-		color: var(--text-secondary);
-		margin: 8px 0 0;
 		display: -webkit-box;
 		-webkit-line-clamp: 3;
 		-webkit-box-orient: vertical;
 		overflow: hidden;
 	}
 
-	/* Fade in animation */
-	:global(.fade-in) {
-		animation: fadeIn 0.3s ease-out;
+	/* ===== MÁS NOTICIAS ===== */
+	.more-stories {
+		padding: 48px 0;
+		border-top: 1px solid var(--border-subtle);
 	}
 
-	@keyframes fadeIn {
-		from {
-			opacity: 0;
-			transform: translateY(10px);
+	.section-label {
+		font-size: 0.75rem;
+		font-weight: 600;
+		text-transform: uppercase;
+		letter-spacing: 0.05em;
+		color: var(--accent-section, #f59e0b);
+		margin: 0 0 32px;
+	}
+
+	.stories-list {
+		display: flex;
+		flex-direction: column;
+		gap: 0;
+	}
+
+	.compact-entry {
+		padding: 20px 0;
+		border-bottom: 1px solid var(--border-subtle);
+		padding-left: 16px;
+		margin-left: -16px;
+		border-left: 2px solid transparent;
+		transition: border-color 0.2s ease;
+	}
+
+	.compact-entry:hover {
+		border-left-color: var(--accent-section, #f59e0b);
+	}
+
+	.compact-entry:last-child {
+		border-bottom: none;
+	}
+
+	.compact-title {
+		font-size: 1rem;
+		font-weight: 500;
+		line-height: 1.4;
+		margin: 0;
+		color: var(--text-primary);
+	}
+
+	.compact-title a {
+		color: inherit;
+		text-decoration: none;
+	}
+
+	.compact-title a:hover {
+		color: var(--text-secondary);
+	}
+
+	.compact-entry .story-meta {
+		margin-bottom: 6px;
+		font-size: 0.75rem;
+	}
+
+	/* ===== AVISO DEL SITIO ===== */
+	.site-notice {
+		padding: 48px 0 64px;
+		border-top: 1px solid var(--border-subtle);
+		margin-top: 48px;
+	}
+
+	.site-notice p {
+		font-size: 0.8rem;
+		line-height: 1.6;
+		color: var(--text-muted);
+		margin: 0;
+		max-width: 480px;
+		opacity: 0.7;
+	}
+
+	/* ===== COLORES DE CATEGORÍA (sutiles) ===== */
+	.category[data-cat="política"],
+	.story-entry:has(.category:contains("Política")) .category,
+	.compact-entry:has(.category:contains("Política")) .category {
+		color: #6366f1;
+	}
+
+	.category[data-cat="economía"] {
+		color: #059669;
+	}
+
+	.category[data-cat="sociedad"] {
+		color: #d97706;
+	}
+
+	.category[data-cat="deportes"] {
+		color: #dc2626;
+	}
+
+	.category[data-cat="tecnología"] {
+		color: #0891b2;
+	}
+
+	.category[data-cat="cultura"] {
+		color: #7c3aed;
+	}
+
+	/* ===== RESPONSIVE ===== */
+	@media (max-width: 640px) {
+		.editorial-index {
+			padding: 0 16px;
 		}
-		to {
-			opacity: 1;
-			transform: translateY(0);
+
+		.featured-grid {
+			padding: 32px 0 40px;
+		}
+
+		.recent-stories {
+			padding: 40px 0;
+		}
+
+		.story-entry {
+			padding: 28px 0;
+			padding-left: 14px;
+			margin-left: -14px;
+		}
+
+		.story-title {
+			font-size: 1.1rem;
+		}
+
+		.story-summary {
+			font-size: 0.9rem;
+		}
+
+		.more-stories {
+			padding: 36px 0;
+		}
+
+		.compact-entry {
+			padding: 18px 0;
+			padding-left: 12px;
+			margin-left: -12px;
+		}
+
+		.compact-title {
+			font-size: 0.95rem;
+		}
+
+		.story-meta {
+			font-size: 0.75rem;
+		}
+
+		.site-notice {
+			padding: 32px 0 48px;
+			margin-top: 32px;
+		}
+
+		.site-notice p {
+			font-size: 0.75rem;
 		}
 	}
 
-	#scroll-trigger {
-		height: 1px;
+	/* ===== COLORES Y DARK MODE ===== */
+	:root {
+		--accent-muted: #6b7280;
+		--accent-main: #64748b;
+		--accent-recent: #64748b;
+		--accent-section: #d97706;
 	}
 
-	@media (max-width: 768px) {
-		.featured-main .featured-title,
-		.featured-secondary .featured-title {
-			font-size: 1.75rem;
+	@media (prefers-color-scheme: dark) {
+		:root {
+			--accent-muted: #9ca3af;
+			--accent-main: #94a3b8;
+			--accent-recent: #94a3b8;
+			--accent-section: #f59e0b;
 		}
+	}
 
-		.featured-main .featured-summary,
-		.featured-secondary .featured-summary {
-			font-size: 1rem;
-		}
-
-		.featured-card {
-			padding: 20px;
-		}
-
-		.news-card {
-			padding: 20px;
-		}
-
-		.card-footer { flex-direction: column; align-items: flex-start; }
-		.card-header { flex-direction: column; align-items: flex-start; }
+	/* ===== ADSENSE IN-FEED ===== */
+	.ad-infeed {
+		padding: 16px;
+		margin: 32px 0;
+		background: var(--bg-card);
+		border: 1px solid var(--border-subtle);
+		border-radius: 8px;
+		text-align: center;
+	}
+	.ad-infeed::before {
+		content: 'PUBLICIDAD';
+		display: block;
+		font-size: 0.65rem;
+		color: var(--text-muted);
+		letter-spacing: 1px;
+		margin-bottom: 8px;
 	}
 </style>

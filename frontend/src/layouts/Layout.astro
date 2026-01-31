@@ -3,6 +3,29 @@ interface Props {
 	title?: string;
 }
 const { title = 'La Data Justa' } = Astro.props;
+
+const API_BASE = import.meta.env.PUBLIC_API_BASE_URL ?? 'http://localhost:8000';
+
+interface Section {
+	id: number;
+	name: string;
+	slug: string;
+	is_active: boolean;
+}
+
+let sections: Section[] = [];
+
+try {
+	const res = await fetch(`${API_BASE}/api/sections`);
+	if (res.ok) {
+		const data = await res.json();
+		sections = Array.isArray(data) ? data : (data.sections || []);
+	}
+} catch (e) {
+	console.error('Error loading sections:', e);
+}
+
+const activeSections = sections.filter(s => s.is_active).slice(0, 6);
 ---
 
 <!doctype html>
@@ -22,49 +45,91 @@ const { title = 'La Data Justa' } = Astro.props;
 		<meta name="generator" content={Astro.generator} />
 		<meta name="description" content="Noticias cortas, claras y directas al punto." />
 		<title>{title}</title>
+
+		<!-- Google AdSense -->
+		<!-- IMPORTANTE: Reemplazar ca-pub-XXXXXXXXXX con tu Publisher ID real -->
+		<script is:inline async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-XXXXXXXXXX" crossorigin="anonymous"></script>
+
 		<script is:inline>
 			const theme = localStorage.getItem('theme') || 'dark';
 			document.documentElement.setAttribute('data-theme', theme);
 		</script>
 	</head>
 	<body>
-		<div class="app">
-			<header class="header">
-				<div class="header-content">
-					<a class="logo" href="/">
-						<span class="logo-text">La Data Justa</span>
-					</a>
-					<nav class="nav" id="nav-menu">
-						<a href="/" class="nav-link active">Inicio</a>
-						<a href="/tendencias" class="nav-link">Tendencias</a>
-					</nav>
-					<div class="header-actions">
-						<button class="theme-toggle" id="theme-toggle" title="Cambiar tema">
-							<span class="icon-sun">&#9728;</span>
-							<span class="icon-moon">&#9790;</span>
-						</button>
-						<span class="live-badge">
-							<span class="live-dot"></span>
-							24/7
-						</span>
-						<button class="menu-toggle" id="menu-toggle" aria-label="Abrir menu">
-							<span class="hamburger-line"></span>
-							<span class="hamburger-line"></span>
-							<span class="hamburger-line"></span>
-						</button>
+		<div class="site-skin-wrapper">
+			<!-- Skin Ad Izquierdo -->
+			<div class="skin-ad skin-ad-left" id="skin-ad-left-container">
+				<div class="skin-ad-content">
+					<span class="ad-label">PUBLICIDAD</span>
+					<!-- GAM Slot: Skin Left -->
+					<div id="div-gpt-ad-skin-left"></div>
+				</div>
+			</div>
+
+			<!-- Contenido Principal -->
+			<div class="site-content">
+				<div class="app">
+					<header class="header">
+						<div class="header-content">
+							<a class="logo" href="/">
+								<img src="/images/logo.png" alt="La Data Justa" class="logo-img" />
+							</a>
+							<nav class="nav" id="nav-menu">
+								<a href="/" class="nav-link active">Inicio</a>
+								{activeSections.map(section => (
+									<a href={`/seccion/${section.slug}`} class="nav-link">{section.name}</a>
+								))}
+							</nav>
+							<div class="header-actions">
+								<button class="theme-toggle" id="theme-toggle" title="Cambiar tema">
+									<span class="icon-sun">&#9728;</span>
+									<span class="icon-moon">&#9790;</span>
+								</button>
+								<span class="live-badge">
+									<span class="live-dot"></span>
+									24/7
+								</span>
+								<button class="menu-toggle" id="menu-toggle" aria-label="Abrir menu">
+									<span class="hamburger-line"></span>
+									<span class="hamburger-line"></span>
+									<span class="hamburger-line"></span>
+								</button>
+							</div>
+						</div>
+					</header>
+
+					<!-- AdSense: Leaderboard (728x90) - Debajo del header -->
+					<div class="ad-container ad-leaderboard">
+						<ins class="adsbygoogle"
+							style="display:block"
+							data-ad-client="ca-pub-XXXXXXXXXX"
+							data-ad-slot="XXXXXXXXXX"
+							data-ad-format="horizontal"
+							data-full-width-responsive="true"></ins>
+						<script is:inline>(adsbygoogle = window.adsbygoogle || []).push({});</script>
 					</div>
+
+					<main class="main">
+						<slot />
+					</main>
+					<footer class="footer">
+						<div class="footer-content">
+							<div class="footer-brand">La Data Justa</div>
+							<p class="footer-tagline">Este sitio se actualiza automáticamente, las 24 horas, leyendo y procesando información pública con inteligencia artificial.</p>
+							<p class="footer-copy">{new Date().getFullYear()} La Data Justa</p>
+						</div>
+					</footer>
 				</div>
-			</header>
-			<main class="main">
-				<slot />
-			</main>
-			<footer class="footer">
-				<div class="footer-content">
-					<div class="footer-brand">La Data Justa</div>
-					<p class="footer-tagline">Noticias procesadas por IA. Cortas, claras y verificables.</p>
-					<p class="footer-copy">{new Date().getFullYear()} La Data Justa</p>
+			</div>
+
+			<!-- Skin Ad Derecho -->
+			<div class="skin-ad skin-ad-right" id="skin-ad-right-container">
+				<div class="skin-ad-content">
+					<span class="ad-label">PUBLICIDAD</span>
+					<!-- GAM Slot: Skin Right -->
+					<div id="div-gpt-ad-skin-right"></div>
 				</div>
-			</footer>
+			</div>
 		</div>
 	</body>
 </html>
@@ -101,6 +166,212 @@ const { title = 'La Data Justa' } = Astro.props;
 				});
 			});
 		}
+	});
+</script>
+
+<!-- Google Ad Manager (GAM) Configuration -->
+<script is:inline>
+	// =============================================================================
+	// CONFIGURACIÓN GOOGLE AD MANAGER (GAM) - SITE SKIN ADS
+	// =============================================================================
+
+	// TODO: Reemplazar con tu Network Code y Ad Unit Paths
+	var GAM_CONFIG = {
+		networkCode: '123456789', // REEMPLAZAR: Tu GAM Network Code (ej: '123456789')
+		adUnits: {
+			skinLeft: '/123456789/ladatajusta/skin_left',   // REEMPLAZAR: Ad Unit Path completo
+			skinRight: '/123456789/ladatajusta/skin_right'  // REEMPLAZAR: Ad Unit Path completo
+		},
+		sizes: {
+			skinLeft: [[300, 600], [160, 600]],   // Tamaños permitidos: 300x600 (half-page), 160x600 (wide skyscraper)
+			skinRight: [[300, 600], [160, 600]]
+		},
+		breakpoint: 1700 // Mostrar skin ads solo en pantallas >= 1700px
+	};
+
+	// Inicializar googletag
+	window.googletag = window.googletag || { cmd: [] };
+
+	// Variables globales para los slots
+	var skinLeftSlot = null;
+	var skinRightSlot = null;
+	var skinAdsLoaded = false;
+	var currentViewportWidth = window.innerWidth;
+
+	/**
+	 * Verifica si el viewport es suficientemente ancho para mostrar skin ads
+	 */
+	function shouldShowSkinAds() {
+		return window.innerWidth >= GAM_CONFIG.breakpoint;
+	}
+
+	/**
+	 * Inicializa y carga los skin ads de GAM
+	 */
+	function initSkinAds() {
+		if (skinAdsLoaded || !shouldShowSkinAds()) {
+			return;
+		}
+
+		console.log('[GAM] Inicializando Skin Ads...');
+
+		googletag.cmd.push(function() {
+			// Definir slot izquierdo
+			skinLeftSlot = googletag.defineSlot(
+				GAM_CONFIG.adUnits.skinLeft,
+				GAM_CONFIG.sizes.skinLeft,
+				'div-gpt-ad-skin-left'
+			);
+
+			if (skinLeftSlot) {
+				skinLeftSlot.addService(googletag.pubads());
+				console.log('[GAM] Slot izquierdo definido:', GAM_CONFIG.adUnits.skinLeft);
+			}
+
+			// Definir slot derecho
+			skinRightSlot = googletag.defineSlot(
+				GAM_CONFIG.adUnits.skinRight,
+				GAM_CONFIG.sizes.skinRight,
+				'div-gpt-ad-skin-right'
+			);
+
+			if (skinRightSlot) {
+				skinRightSlot.addService(googletag.pubads());
+				console.log('[GAM] Slot derecho definido:', GAM_CONFIG.adUnits.skinRight);
+			}
+
+			// Configurar PubAds
+			googletag.pubads().enableSingleRequest(); // Cargar todos los ads en una sola request
+			googletag.pubads().collapseEmptyDivs(); // Colapsar divs vacíos si no hay ad
+			googletag.pubads().setCentering(true); // Centrar creatividades en el contenedor
+
+			// Event listener para detectar cuando un slot se renderiza
+			googletag.pubads().addEventListener('slotRenderEnded', function(event) {
+				var slotId = event.slot.getSlotElementId();
+				console.log('[GAM] Slot renderizado:', slotId, 'isEmpty:', event.isEmpty);
+
+				// Si el slot está vacío, ocultar el contenedor
+				if (event.isEmpty) {
+					hideAdContainer(slotId);
+				} else {
+					showAdContainer(slotId);
+				}
+			});
+
+			// Habilitar servicios
+			googletag.enableServices();
+			console.log('[GAM] Servicios habilitados');
+
+			// Display de los slots
+			googletag.display('div-gpt-ad-skin-left');
+			googletag.display('div-gpt-ad-skin-right');
+			console.log('[GAM] Display ejecutado para skin ads');
+
+			skinAdsLoaded = true;
+		});
+	}
+
+	/**
+	 * Destruye los skin ads cuando el viewport es muy pequeño
+	 */
+	function destroySkinAds() {
+		if (!skinAdsLoaded) {
+			return;
+		}
+
+		console.log('[GAM] Destruyendo Skin Ads...');
+
+		googletag.cmd.push(function() {
+			if (skinLeftSlot) {
+				googletag.destroySlots([skinLeftSlot]);
+				skinLeftSlot = null;
+			}
+			if (skinRightSlot) {
+				googletag.destroySlots([skinRightSlot]);
+				skinRightSlot = null;
+			}
+			skinAdsLoaded = false;
+
+			// Ocultar contenedores
+			hideAdContainer('div-gpt-ad-skin-left');
+			hideAdContainer('div-gpt-ad-skin-right');
+
+			console.log('[GAM] Slots destruidos');
+		});
+	}
+
+	/**
+	 * Oculta el contenedor de un ad cuando está vacío
+	 */
+	function hideAdContainer(slotId) {
+		var containerId = slotId === 'div-gpt-ad-skin-left'
+			? 'skin-ad-left-container'
+			: 'skin-ad-right-container';
+
+		var container = document.getElementById(containerId);
+		if (container) {
+			container.style.display = 'none';
+			console.log('[GAM] Contenedor oculto:', containerId);
+		}
+	}
+
+	/**
+	 * Muestra el contenedor de un ad cuando se renderiza correctamente
+	 */
+	function showAdContainer(slotId) {
+		var containerId = slotId === 'div-gpt-ad-skin-left'
+			? 'skin-ad-left-container'
+			: 'skin-ad-right-container';
+
+		var container = document.getElementById(containerId);
+		if (container) {
+			container.style.display = 'block';
+			console.log('[GAM] Contenedor visible:', containerId);
+		}
+	}
+
+	/**
+	 * Maneja el cambio de tamaño del viewport
+	 */
+	function handleResize() {
+		var newWidth = window.innerWidth;
+
+		// Si cruzamos el breakpoint, recargar o destruir ads
+		var wasWideEnough = currentViewportWidth >= GAM_CONFIG.breakpoint;
+		var isWideEnough = newWidth >= GAM_CONFIG.breakpoint;
+
+		if (!wasWideEnough && isWideEnough) {
+			// Pasamos de narrow a wide: cargar skin ads
+			console.log('[GAM] Viewport cruzó breakpoint hacia arriba - Cargando skin ads');
+			initSkinAds();
+		} else if (wasWideEnough && !isWideEnough) {
+			// Pasamos de wide a narrow: destruir skin ads
+			console.log('[GAM] Viewport cruzó breakpoint hacia abajo - Destruyendo skin ads');
+			destroySkinAds();
+		}
+
+		currentViewportWidth = newWidth;
+	}
+
+	// Inicializar cuando el DOM esté listo
+	document.addEventListener('DOMContentLoaded', function() {
+		console.log('[GAM] DOM listo - Viewport width:', window.innerWidth);
+
+		// Cargar skin ads si el viewport es suficientemente ancho
+		if (shouldShowSkinAds()) {
+			initSkinAds();
+		} else {
+			console.log('[GAM] Viewport muy pequeño - Skin ads no se cargarán');
+			hideAdContainer('div-gpt-ad-skin-left');
+			hideAdContainer('div-gpt-ad-skin-right');
+		}
+	});
+
+	// Listener para resize con debounce
+	var resizeTimeout;
+	window.addEventListener('resize', function() {
+		clearTimeout(resizeTimeout);
+		resizeTimeout = setTimeout(handleResize, 300); // Debounce de 300ms
 	});
 </script>
 
@@ -155,11 +426,113 @@ const { title = 'La Data Justa' } = Astro.props;
 </style>
 
 <style>
+	/* Site Skin Layout - Wallpaper Ads */
+	.site-skin-wrapper {
+		display: flex;
+		justify-content: center;
+		min-height: 100vh;
+		background: var(--bg-primary);
+	}
+
+	.site-content {
+		width: 100%;
+		max-width: 1200px;
+		background: var(--bg-primary);
+		position: relative;
+		z-index: 1;
+	}
+
+	.skin-ad {
+		display: none; /* Hidden by default, shown on large screens */
+		width: 250px;
+		min-height: 100vh;
+		position: relative;
+	}
+
+	.skin-ad-content {
+		position: sticky;
+		top: 80px;
+		width: 100%;
+		min-height: 600px;
+		background: var(--bg-secondary);
+		border: 2px dashed var(--border-medium);
+		border-radius: var(--radius-lg);
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		justify-content: flex-start;
+		padding: 20px;
+		transition: all 0.3s ease;
+		gap: 16px;
+	}
+
+	.skin-ad-content:hover {
+		border-color: var(--accent-primary);
+		background: var(--bg-card);
+	}
+
+	.skin-ad .ad-label {
+		font-size: 0.7rem;
+		font-weight: 600;
+		color: var(--text-muted);
+		letter-spacing: 1px;
+		text-align: center;
+		padding: 8px 16px;
+		background: var(--bg-card);
+		border-radius: var(--radius-md);
+	}
+
+	/* GAM Ad Slots */
+	#div-gpt-ad-skin-left,
+	#div-gpt-ad-skin-right {
+		min-width: 160px;
+		min-height: 600px;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+	}
+
+	/* Ocultar label cuando hay un ad cargado */
+	.skin-ad-content:has(#div-gpt-ad-skin-left > *) .ad-label,
+	.skin-ad-content:has(#div-gpt-ad-skin-right > *) .ad-label {
+		display: none;
+	}
+
+	/* Ajustar contenedor cuando hay ad */
+	.skin-ad-content:has(#div-gpt-ad-skin-left > *),
+	.skin-ad-content:has(#div-gpt-ad-skin-right > *) {
+		border-style: solid;
+		background: transparent;
+	}
+
+	/* Show skins only on large screens (> 1700px) */
+	@media (min-width: 1700px) {
+		.skin-ad {
+			display: block;
+		}
+
+		.skin-ad-left {
+			margin-right: 20px;
+		}
+
+		.skin-ad-right {
+			margin-left: 20px;
+		}
+	}
+
+	/* Extra large screens - wider skins */
+	@media (min-width: 1920px) {
+		.skin-ad {
+			width: 300px;
+		}
+	}
+
 	.app { display: flex; flex-direction: column; min-height: 100vh; }
 	.header { position: sticky; top: 0; z-index: 100; background: var(--bg-header); backdrop-filter: blur(12px); border-bottom: 1px solid var(--border-subtle); transition: background-color 0.3s; }
-	.header-content { max-width: 1200px; margin: 0 auto; padding: 0 24px; height: 64px; display: flex; align-items: center; justify-content: space-between; gap: 32px; }
+	.header-content { width: 100%; padding: 0 24px; height: 64px; display: flex; align-items: center; justify-content: space-between; gap: 32px; }
 	.logo { display: flex; align-items: center; gap: 10px; color: var(--text-primary); font-weight: 700; font-size: 1.25rem; }
 	.logo:hover { color: var(--text-primary); }
+	.logo-img { height: 55px; width: auto; display: block; }
 	.nav { display: flex; gap: 8px; }
 	.nav-link { padding: 8px 16px; border-radius: var(--radius-md); color: var(--text-secondary); font-weight: 500; font-size: 0.9rem; transition: all 0.2s; }
 	.nav-link:hover { color: var(--text-primary); background: var(--bg-secondary); }
@@ -187,12 +560,49 @@ const { title = 'La Data Justa' } = Astro.props;
 	.live-badge { display: flex; align-items: center; gap: 8px; padding: 6px 12px; background: rgba(34, 197, 94, 0.1); border: 1px solid rgba(34, 197, 94, 0.3); border-radius: var(--radius-lg); color: var(--success); font-size: 0.8rem; font-weight: 600; }
 	.live-dot { width: 8px; height: 8px; background: var(--success); border-radius: 50%; animation: pulse 2s ease-in-out infinite; }
 	@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
-	.main { flex: 1; max-width: 1200px; width: 100%; margin: 0 auto; padding: 32px 24px; }
+	.main { flex: 1; width: 100%; padding: 32px 24px; }
 	.footer { background: var(--bg-secondary); border-top: 1px solid var(--border-subtle); transition: background-color 0.3s; }
-	.footer-content { max-width: 1200px; margin: 0 auto; padding: 40px 24px; text-align: center; }
+	.footer-content { width: 100%; padding: 40px 24px; text-align: center; }
 	.footer-brand { font-weight: 700; font-size: 1.1rem; margin-bottom: 8px; color: var(--text-primary); }
-	.footer-tagline { color: var(--text-secondary); margin: 0 0 12px; }
+	.footer-tagline { color: var(--text-secondary); margin: 0 0 12px; max-width: 500px; margin-left: auto; margin-right: auto; }
 	.footer-copy { color: var(--text-muted); font-size: 0.85rem; margin: 0; }
+
+	/* AdSense Containers */
+	.ad-container {
+		width: 100%;
+		display: flex;
+		justify-content: center;
+		background: var(--bg-secondary);
+		border-bottom: 1px solid var(--border-subtle);
+		overflow: hidden;
+	}
+	.ad-leaderboard {
+		padding: 12px 24px;
+		min-height: 90px;
+	}
+	.ad-leaderboard .adsbygoogle {
+		width: 100%;
+		max-width: 728px;
+		height: 90px;
+	}
+	.ad-rectangle {
+		padding: 16px;
+		margin: 24px 0;
+		border-radius: var(--radius-md);
+		border: 1px solid var(--border-subtle);
+	}
+	.ad-infeed {
+		padding: 12px;
+		margin: 16px 0;
+		border-radius: var(--radius-md);
+		background: var(--bg-card);
+		border: 1px solid var(--border-subtle);
+	}
+	/* Hide ads on very small screens for better UX */
+	@media (max-width: 480px) {
+		.ad-leaderboard { display: none; }
+	}
+
 	/* Mobile menu toggle button */
 	.menu-toggle {
 		display: none;
@@ -227,7 +637,7 @@ const { title = 'La Data Justa' } = Astro.props;
 	/* Mobile styles */
 	@media (max-width: 768px) {
 		.header-content { padding: 0 16px; gap: 16px; }
-		.logo-text { font-size: 1.1rem; }
+		.logo-img { height: 46px; }
 		.live-badge { display: none; }
 		.menu-toggle { display: flex; }
 
@@ -258,8 +668,8 @@ const { title = 'La Data Justa' } = Astro.props;
 	}
 
 	@media (max-width: 480px) {
-		.header-content { height: 56px; }
-		.logo-text { font-size: 1rem; }
+		.header-content { height: 64px; }
+		.logo-img { height: 40px; }
 		.theme-toggle { width: 36px; height: 36px; font-size: 1rem; }
 		.main { padding: 16px 12px; }
 		.footer-content { padding: 32px 16px; }

@@ -13,6 +13,9 @@ services:
   backend:
     build:
       context: ./backend
+    volumes:
+      - ./backend:/app
+      - ./frontend/public/images:/frontend_images
     environment:
       APP_ENV: dev
       DATABASE_URL: postgresql+asyncpg://ladatajusta:ladatajusta@db:5432/ladatajusta

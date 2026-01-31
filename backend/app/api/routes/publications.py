@@ -66,6 +66,10 @@ def _to_publication_out(pub: Publication) -> PublicationOut:
         content_en_profundidad=pub.content_en_profundidad,
         media=pub.media or [],
         image_url=image_url,
+        is_featured=pub.is_featured,
+        featured_order=pub.featured_order,
+        pulso_informativo=pub.pulso_informativo,
+        origin_type=pub.origin_type,
     )
 
 
@@ -99,15 +103,20 @@ async def list_publications(
 async def search_publications(
     db: AsyncSession = Depends(get_db),
     q: Annotated[str | None, Query(description="Texto a buscar")] = None,
+    agent_id: Annotated[str | None, Query(description="Filtrar por agente")] = None,
     category: Annotated[str | None, Query(description="Filtrar por categoria")] = None,
     tags: Annotated[list[str] | None, Query(description="Filtrar por tags")] = None,
     from_date: Annotated[date | None, Query(description="Desde fecha")] = None,
     to_date: Annotated[date | None, Query(description="Hasta fecha")] = None,
     state: Annotated[str, Query(description="Estado")] = "published",
+    is_featured: Annotated[bool | None, Query(description="Filtrar por destacadas")] = None,
     limit: Annotated[int, Query(ge=1, le=100)] = 20,
     offset: Annotated[int, Query(ge=0)] = 0,
 ) -> PaginatedPublications:
     conditions = [Publication.state == state]
+
+    if is_featured is not None:
+        conditions.append(Publication.is_featured == is_featured)
 
     if q:
         search_term = f"%{q}%"
@@ -118,6 +127,13 @@ async def search_publications(
                 Publication.body.ilike(search_term),
             )
         )
+
+    if agent_id:
+        try:
+            agent_uuid = uuid.UUID(agent_id)
+            conditions.append(Publication.agent_id == agent_uuid)
+        except ValueError:
+            pass  # Invalid UUID, ignore filter
 
     if category:
         conditions.append(Publication.category == category)
@@ -135,15 +151,15 @@ async def search_publications(
     count_q = select(func.count()).select_from(Publication).where(and_(*conditions))
     total = await db.scalar(count_q) or 0
 
-    # Fetch items
-    items_q = (
-        select(Publication)
-        .options(selectinload(Publication.agent))
-        .where(and_(*conditions))
-        .order_by(Publication.published_at.desc().nullslast(), Publication.created_at.desc())
-        .limit(limit)
-        .offset(offset)
-    )
+    # Fetch items - order by featured_order if filtering featured, otherwise by date
+    items_q = select(Publication).options(selectinload(Publication.agent)).where(and_(*conditions))
+
+    if is_featured:
+        items_q = items_q.order_by(Publication.featured_order.asc().nullslast(), Publication.published_at.desc().nullslast())
+    else:
+        items_q = items_q.order_by(Publication.published_at.desc().nullslast(), Publication.created_at.desc())
+
+    items_q = items_q.limit(limit).offset(offset)
     rows = (await db.scalars(items_q)).all()
 
     items = [_to_publication_out(r) for r in rows]
@@ -155,6 +171,117 @@ async def search_publications(
         offset=offset,
         has_more=(offset + len(items)) < total,
     )
+
+
+# ===== FEATURED PUBLICATIONS ENDPOINTS =====
+# NOTE: These must come BEFORE the /{publication_id_or_slug} catch-all route
+
+@router.get("/featured", response_model=list[PublicationOut])
+async def get_featured_publications(
+    db: AsyncSession = Depends(get_db),
+) -> list[PublicationOut]:
+    """
+    Get all featured publications ordered by featured_order.
+    Public endpoint.
+    """
+    query = (
+        select(Publication)
+        .options(selectinload(Publication.agent))
+        .where(
+            Publication.is_featured == True,
+            Publication.state == "published"
+        )
+        .order_by(Publication.featured_order.asc().nulls_last())
+        .limit(4)
+    )
+
+    result = await db.execute(query)
+    publications = result.scalars().all()
+
+    return [_to_publication_out(pub) for pub in publications]
+
+
+@router.post("/{publication_id}/feature", response_model=dict)
+async def set_publication_featured(
+    publication_id: uuid.UUID,
+    featured_order: Annotated[int, Query(ge=1, le=4, description="Display order (1-4)")],
+    current_user: CurrentAdmin,
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """
+    Mark a publication as featured with a specific order.
+    Admin only. Maximum 4 featured publications.
+    """
+    # Get publication
+    pub_result = await db.execute(
+        select(Publication).where(Publication.id == publication_id)
+    )
+    pub = pub_result.scalar_one_or_none()
+
+    if not pub:
+        raise HTTPException(status_code=404, detail="Publication not found")
+
+    if pub.state != "published":
+        raise HTTPException(status_code=400, detail="Only published articles can be featured")
+
+    # Check if featured_order is already taken
+    existing = await db.execute(
+        select(Publication).where(
+            Publication.featured_order == featured_order,
+            Publication.id != publication_id
+        )
+    )
+    existing_pub = existing.scalar_one_or_none()
+
+    if existing_pub:
+        # Swap orders if another publication has this order
+        old_order = pub.featured_order
+        pub.featured_order = None  # Temporarily set to None to avoid constraint violation
+        await db.flush()
+
+        existing_pub.featured_order = old_order
+        await db.flush()
+
+    # Set as featured
+    pub.is_featured = True
+    pub.featured_order = featured_order
+
+    await db.commit()
+
+    return {
+        "message": f"Publication marked as featured at position {featured_order}",
+        "id": str(publication_id),
+        "featured_order": featured_order
+    }
+
+
+@router.delete("/{publication_id}/feature", response_model=dict)
+async def unset_publication_featured(
+    publication_id: uuid.UUID,
+    current_user: CurrentAdmin,
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """
+    Remove featured status from a publication.
+    Admin only.
+    """
+    pub_result = await db.execute(
+        select(Publication).where(Publication.id == publication_id)
+    )
+    pub = pub_result.scalar_one_or_none()
+
+    if not pub:
+        raise HTTPException(status_code=404, detail="Publication not found")
+
+    pub.is_featured = False
+    pub.featured_order = None
+
+    await db.commit()
+
+    return {
+        "message": "Publication unfeatured successfully",
+        "id": str(publication_id)
+    }
 
 
 @router.get("/{publication_id_or_slug}", response_model=PublicationOut)
@@ -301,6 +428,8 @@ async def update_publication(
         pub.content_en_profundidad = payload.content_en_profundidad
     if payload.media is not None:
         pub.media = [item.model_dump() for item in payload.media]
+    if payload.pulso_informativo is not None:
+        pub.pulso_informativo = payload.pulso_informativo
 
     await db.commit()
     await db.refresh(pub)

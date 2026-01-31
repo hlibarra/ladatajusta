@@ -14,15 +14,102 @@ import AdminLayout from '../../../layouts/AdminLayout.astro';
     <button class="tab active" data-state="all">Todas</button>
     <button class="tab" data-state="draft">Borradores</button>
     <button class="tab" data-state="published">Publicadas</button>
+    <button class="tab featured-tab" data-state="featured">⭐ Destacadas</button>
     <button class="tab" data-state="discarded">Descartadas</button>
+  </div>
+
+  <!-- Filters Section -->
+  <div class="filters-card card">
+    <div class="filters-header">
+      <h3 class="filters-title">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+          <path d="M22 3H2l8 9.46V19l4 2v-8.54L22 3z"></path>
+        </svg>
+        Filtros
+      </h3>
+      <button class="btn-text" id="btn-clear-filters">Limpiar filtros</button>
+    </div>
+
+    <div class="filters-grid">
+      <!-- Search -->
+      <div class="filter-group">
+        <label for="filter-search" class="filter-label">Buscar</label>
+        <input
+          type="text"
+          id="filter-search"
+          class="filter-input"
+          placeholder="Título, resumen o contenido..."
+        />
+      </div>
+
+      <!-- Agent -->
+      <div class="filter-group">
+        <label for="filter-agent" class="filter-label">Agente</label>
+        <select id="filter-agent" class="filter-select">
+          <option value="">Todos los agentes</option>
+        </select>
+      </div>
+
+      <!-- Category -->
+      <div class="filter-group">
+        <label for="filter-category" class="filter-label">Categoría</label>
+        <input
+          type="text"
+          id="filter-category"
+          class="filter-input"
+          placeholder="ej: política, economía..."
+        />
+      </div>
+
+      <!-- Date from -->
+      <div class="filter-group">
+        <label for="filter-date-from" class="filter-label">Desde fecha</label>
+        <input
+          type="date"
+          id="filter-date-from"
+          class="filter-input"
+        />
+      </div>
+
+      <!-- Date to -->
+      <div class="filter-group">
+        <label for="filter-date-to" class="filter-label">Hasta fecha</label>
+        <input
+          type="date"
+          id="filter-date-to"
+          class="filter-input"
+        />
+      </div>
+
+      <!-- Tags -->
+      <div class="filter-group">
+        <label for="filter-tags" class="filter-label">Tags</label>
+        <input
+          type="text"
+          id="filter-tags"
+          class="filter-input"
+          placeholder="separados por comas"
+        />
+      </div>
+    </div>
+
+    <div class="filters-actions">
+      <button class="btn btn-primary" id="btn-apply-filters">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+          <path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+        </svg>
+        Aplicar Filtros
+      </button>
+    </div>
   </div>
 
   <div class="card">
     <table class="table">
       <thead>
         <tr>
-          <th>Titulo</th>
-          <th>Categoria</th>
+          <th>Título</th>
+          <th>Agente</th>
+          <th>Categoría</th>
           <th>Estado</th>
           <th>Fecha</th>
           <th>Acciones</th>
@@ -37,6 +124,36 @@ import AdminLayout from '../../../layouts/AdminLayout.astro';
 
     <div class="pagination" id="pagination"></div>
   </div>
+
+  <!-- Featured Modal -->
+  <div class="modal" id="featured-modal" style="display: none;">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 id="featured-modal-title">Destacar Publicación</h2>
+        <button class="modal-close" id="featured-modal-close">&times;</button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="featured-pub-id" />
+        <p id="featured-pub-title" class="featured-title"></p>
+
+        <div class="form-group">
+          <label for="featured-position">Posición (1-4)</label>
+          <select id="featured-position" class="form-input">
+            <option value="1">1 - Primera posición</option>
+            <option value="2">2 - Segunda posición</option>
+            <option value="3">3 - Tercera posición</option>
+            <option value="4">4 - Cuarta posición</option>
+          </select>
+          <small>Máximo 4 noticias destacadas. Si la posición está ocupada, se intercambiará.</small>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" id="btn-featured-cancel">Cancelar</button>
+        <button class="btn btn-danger" id="btn-featured-remove" style="display: none;">Quitar Destacado</button>
+        <button class="btn btn-primary" id="btn-featured-save">Guardar</button>
+      </div>
+    </div>
+  </div>
 </AdminLayout>
 
 <script>
@@ -46,15 +163,60 @@ import AdminLayout from '../../../layouts/AdminLayout.astro';
   let currentOffset = 0;
   const limit = 20;
 
+  // Filter state
+  let currentFilters = {
+    search: '',
+    agent: '',
+    category: '',
+    dateFrom: '',
+    dateTo: '',
+    tags: '',
+  };
+
   async function loadPublications() {
     const tbody = document.getElementById('publications-tbody')!;
-    tbody.innerHTML = '<tr><td colspan="5" class="loading-cell">Cargando...</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="6" class="loading-cell">Cargando...</td></tr>';
 
     try {
-      let url = `/api/publications/search?limit=${limit}&offset=${currentOffset}`;
-      if (currentState !== 'all') {
-        url += `&state=${currentState}`;
+      // Build URL with filters
+      const params = new URLSearchParams();
+      params.append('limit', String(limit));
+      params.append('offset', String(currentOffset));
+
+      if (currentState === 'featured') {
+        // Filter for featured publications only
+        params.append('is_featured', 'true');
+        params.append('state', 'published'); // Featured are always published
+      } else if (currentState !== 'all') {
+        params.append('state', currentState);
       }
+
+      if (currentFilters.search) {
+        params.append('q', currentFilters.search);
+      }
+
+      if (currentFilters.agent) {
+        params.append('agent_id', currentFilters.agent);
+      }
+
+      if (currentFilters.category) {
+        params.append('category', currentFilters.category);
+      }
+
+      if (currentFilters.dateFrom) {
+        params.append('from_date', currentFilters.dateFrom);
+      }
+
+      if (currentFilters.dateTo) {
+        params.append('to_date', currentFilters.dateTo);
+      }
+
+      if (currentFilters.tags) {
+        const tags = currentFilters.tags.split(',').map(t => t.trim()).filter(Boolean);
+        tags.forEach(tag => params.append('tags', tag));
+      }
+
+      let url = `/api/publications/search?${params}`;
 
       const r = await authFetch(url);
       if (!r.ok) throw new Error('Failed to load');
@@ -62,7 +224,7 @@ import AdminLayout from '../../../layouts/AdminLayout.astro';
       const data = await r.json();
 
       if (data.items.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="5" class="empty-cell">No hay publicaciones</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="6" class="empty-cell">No hay publicaciones</td></tr>';
         return;
       }
 
@@ -70,6 +232,13 @@ import AdminLayout from '../../../layouts/AdminLayout.astro';
         <tr data-id="${p.id}">
           <td>
             <a href="/admin/noticias/${p.id}" class="title-link">${p.title}</a>
+          </td>
+          <td>
+            ${p.agent ? `
+              <div class="agent-cell">
+                <span class="agent-name">${p.agent.name}</span>
+              </div>
+            ` : '<span class="text-muted">-</span>'}
           </td>
           <td>${p.category || '-'}</td>
           <td>
@@ -85,6 +254,15 @@ import AdminLayout from '../../../layouts/AdminLayout.astro';
               <button class="btn btn-small btn-secondary restore-btn" data-id="${p.id}">Restaurar</button>
             ` : ''}
             ${p.state === 'published' ? `
+              ${p.is_featured ? `
+                <button class="btn btn-small btn-success featured-btn" data-id="${p.id}" data-featured="true" title="Destacada en posición ${p.featured_order || '?'}">
+                  ⭐ #${p.featured_order || '?'}
+                </button>
+              ` : `
+                <button class="btn btn-small btn-secondary featured-btn" data-id="${p.id}" data-featured="false">
+                  Destacar
+                </button>
+              `}
               <button class="btn btn-small btn-warning discard-btn" data-id="${p.id}">Descartar</button>
             ` : ''}
             <a href="/admin/noticias/${p.id}" class="btn btn-small btn-secondary">Editar</a>
@@ -99,7 +277,7 @@ import AdminLayout from '../../../layouts/AdminLayout.astro';
       updatePagination(data.total, data.has_more);
     } catch (e) {
       console.error('Error:', e);
-      tbody.innerHTML = '<tr><td colspan="5" class="error-cell">Error al cargar</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="6" class="error-cell">Error al cargar</td></tr>';
     }
   }
 
@@ -164,6 +342,16 @@ import AdminLayout from '../../../layouts/AdminLayout.astro';
         await restorePublication(id!);
       });
     });
+
+    document.querySelectorAll('.featured-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const id = btn.getAttribute('data-id');
+        const isFeatured = btn.getAttribute('data-featured') === 'true';
+        const row = btn.closest('tr');
+        const title = row?.querySelector('.title-link')?.textContent || '';
+        openFeaturedModal(id!, title, isFeatured);
+      });
+    });
   }
 
   async function changeState(id: string, state: string) {
@@ -193,6 +381,61 @@ import AdminLayout from '../../../layouts/AdminLayout.astro';
     }
   }
 
+  // Load agents for filter dropdown
+  async function loadAgents() {
+    try {
+      const r = await authFetch('/api/agents');
+      if (!r.ok) return;
+
+      const agents = await r.json();
+      const select = document.getElementById('filter-agent') as HTMLSelectElement;
+
+      agents.forEach((agent: any) => {
+        const option = document.createElement('option');
+        option.value = agent.id;
+        option.textContent = agent.name;
+        select.appendChild(option);
+      });
+    } catch (e) {
+      console.error('Error loading agents:', e);
+    }
+  }
+
+  // Apply filters
+  function applyFilters() {
+    currentFilters.search = (document.getElementById('filter-search') as HTMLInputElement).value;
+    currentFilters.agent = (document.getElementById('filter-agent') as HTMLSelectElement).value;
+    currentFilters.category = (document.getElementById('filter-category') as HTMLInputElement).value;
+    currentFilters.dateFrom = (document.getElementById('filter-date-from') as HTMLInputElement).value;
+    currentFilters.dateTo = (document.getElementById('filter-date-to') as HTMLInputElement).value;
+    currentFilters.tags = (document.getElementById('filter-tags') as HTMLInputElement).value;
+
+    currentOffset = 0;
+    loadPublications();
+  }
+
+  // Clear filters
+  function clearFilters() {
+    (document.getElementById('filter-search') as HTMLInputElement).value = '';
+    (document.getElementById('filter-agent') as HTMLSelectElement).value = '';
+    (document.getElementById('filter-category') as HTMLInputElement).value = '';
+    (document.getElementById('filter-date-from') as HTMLInputElement).value = '';
+    (document.getElementById('filter-date-to') as HTMLInputElement).value = '';
+    (document.getElementById('filter-tags') as HTMLInputElement).value = '';
+
+    currentFilters = {
+      search: '',
+      agent: '',
+      category: '',
+      dateFrom: '',
+      dateTo: '',
+      tags: '',
+    };
+
+    currentOffset = 0;
+    loadPublications();
+  }
+
   // Tab switching
   document.querySelectorAll('.tab').forEach(tab => {
     tab.addEventListener('click', () => {
@@ -204,8 +447,104 @@ import AdminLayout from '../../../layouts/AdminLayout.astro';
     });
   });
 
+  // Filter buttons
+  document.getElementById('btn-apply-filters')?.addEventListener('click', applyFilters);
+  document.getElementById('btn-clear-filters')?.addEventListener('click', clearFilters);
+
+  // Press Enter to apply filters
+  document.querySelectorAll('.filter-input').forEach(input => {
+    input.addEventListener('keypress', (e) => {
+      if ((e as KeyboardEvent).key === 'Enter') {
+        applyFilters();
+      }
+    });
+  });
+
+  // Featured publications modal logic
+  function openFeaturedModal(id: string, title: string, isFeatured: boolean) {
+    const modal = document.getElementById('featured-modal')!;
+    const titleEl = document.getElementById('featured-pub-title')!;
+    const idInput = document.getElementById('featured-pub-id') as HTMLInputElement;
+    const removeBtn = document.getElementById('btn-featured-remove')!;
+
+    idInput.value = id;
+    titleEl.textContent = title;
+
+    if (isFeatured) {
+      removeBtn.style.display = 'inline-block';
+    } else {
+      removeBtn.style.display = 'none';
+    }
+
+    modal.style.display = 'flex';
+  }
+
+  function closeFeaturedModal() {
+    document.getElementById('featured-modal')!.style.display = 'none';
+  }
+
+  async function saveFeatured() {
+    const id = (document.getElementById('featured-pub-id') as HTMLInputElement).value;
+    const position = parseInt((document.getElementById('featured-position') as HTMLSelectElement).value);
+
+    try {
+      const r = await authFetch(`/api/publications/${id}/feature?featured_order=${position}`, {
+        method: 'POST',
+      });
+
+      if (!r.ok) {
+        const error = await r.json();
+        throw new Error(error.detail || 'Error al destacar');
+      }
+
+      closeFeaturedModal();
+      loadPublications();
+    } catch (e: any) {
+      console.error('Error:', e);
+      alert(e.message || 'Error al destacar la publicación');
+    }
+  }
+
+  async function removeFeatured() {
+    const id = (document.getElementById('featured-pub-id') as HTMLInputElement).value;
+
+    if (!confirm('¿Quitar esta publicación de destacadas?')) {
+      return;
+    }
+
+    try {
+      const r = await authFetch(`/api/publications/${id}/feature`, {
+        method: 'DELETE',
+      });
+
+      if (!r.ok) throw new Error('Error al quitar destacado');
+
+      closeFeaturedModal();
+      loadPublications();
+    } catch (e) {
+      console.error('Error:', e);
+      alert('Error al quitar el destacado');
+    }
+  }
+
+  // Featured modal event listeners
+  document.getElementById('featured-modal-close')?.addEventListener('click', closeFeaturedModal);
+  document.getElementById('btn-featured-cancel')?.addEventListener('click', closeFeaturedModal);
+  document.getElementById('btn-featured-save')?.addEventListener('click', saveFeatured);
+  document.getElementById('btn-featured-remove')?.addEventListener('click', removeFeatured);
+
+  // Close modal on outside click
+  window.addEventListener('click', (e) => {
+    if ((e.target as HTMLElement).id === 'featured-modal') {
+      closeFeaturedModal();
+    }
+  });
+
   // Initial load
-  document.addEventListener('DOMContentLoaded', loadPublications);
+  document.addEventListener('DOMContentLoaded', () => {
+    loadAgents();
+    loadPublications();
+  });
 </script>
 
 <style>
@@ -244,6 +583,15 @@ import AdminLayout from '../../../layouts/AdminLayout.astro';
   .tab.active {
     background: var(--bg-secondary);
     color: var(--text-primary);
+  }
+
+  .tab.featured-tab {
+    color: #f59e0b;
+  }
+
+  .tab.featured-tab.active {
+    background: rgba(245, 158, 11, 0.15);
+    color: #f59e0b;
   }
 
   .title-link {
@@ -288,6 +636,112 @@ import AdminLayout from '../../../layouts/AdminLayout.astro';
   .page-info {
     font-size: 0.9rem;
     color: var(--text-secondary);
+  }
+
+  /* Filters */
+  .filters-card {
+    margin-bottom: 24px;
+  }
+
+  .filters-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--border-subtle);
+  }
+
+  .filters-title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 0;
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text-primary);
+  }
+
+  .filters-title svg {
+    color: var(--accent-secondary);
+  }
+
+  .btn-text {
+    background: none;
+    border: none;
+    color: var(--accent-secondary);
+    font-size: 0.9rem;
+    cursor: pointer;
+    padding: 6px 12px;
+    border-radius: var(--radius-sm);
+    transition: all 0.2s ease;
+  }
+
+  .btn-text:hover {
+    background: rgba(59, 130, 246, 0.1);
+    color: var(--accent-primary);
+  }
+
+  .filters-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 20px;
+    margin-bottom: 20px;
+  }
+
+  .filter-group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .filter-label {
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--text-secondary);
+  }
+
+  .filter-input,
+  .filter-select {
+    padding: 10px 14px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-sm);
+    color: var(--text-primary);
+    font-size: 0.9rem;
+    transition: all 0.2s ease;
+  }
+
+  .filter-input:focus,
+  .filter-select:focus {
+    outline: none;
+    border-color: var(--accent-secondary);
+    background: var(--bg-primary);
+  }
+
+  .filter-input::placeholder {
+    color: var(--text-muted);
+  }
+
+  .filters-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+  }
+
+  .agent-cell {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .agent-name {
+    font-size: 0.875rem;
+    color: var(--text-primary);
+  }
+
+  .text-muted {
+    color: var(--text-muted);
   }
 
   @media (max-width: 768px) {
@@ -346,6 +800,19 @@ import AdminLayout from '../../../layouts/AdminLayout.astro';
       text-align: center;
       order: -1;
     }
+
+    .filters-grid {
+      grid-template-columns: 1fr;
+      gap: 16px;
+    }
+
+    .filters-actions {
+      justify-content: stretch;
+    }
+
+    .filters-actions .btn {
+      flex: 1;
+    }
   }
 
   @media (max-width: 480px) {
@@ -366,5 +833,119 @@ import AdminLayout from '../../../layouts/AdminLayout.astro';
       font-size: 0.65rem;
       padding: 2px 6px;
     }
+  }
+
+  /* Featured Modal Styles */
+  .modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.7);
+    z-index: 1000;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .modal-content {
+    background: var(--bg-card);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg);
+    width: 90%;
+    max-width: 500px;
+    max-height: 90vh;
+    overflow-y: auto;
+  }
+
+  .modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px 24px;
+    border-bottom: 1px solid var(--border-subtle);
+  }
+
+  .modal-header h2 {
+    margin: 0;
+    font-size: 1.25rem;
+  }
+
+  .modal-close {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    font-size: 2rem;
+    cursor: pointer;
+    padding: 0;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--radius-sm);
+    transition: all 0.2s ease;
+  }
+
+  .modal-close:hover {
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+  }
+
+  .modal-body {
+    padding: 24px;
+  }
+
+  .modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+    padding: 20px 24px;
+    border-top: 1px solid var(--border-subtle);
+  }
+
+  .featured-title {
+    font-weight: 600;
+    color: var(--text-primary);
+    margin: 0 0 20px 0;
+    padding: 12px;
+    background: var(--bg-secondary);
+    border-radius: var(--radius-sm);
+  }
+
+  .form-group {
+    margin-bottom: 20px;
+  }
+
+  .form-group label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+  }
+
+  .form-group small {
+    display: block;
+    margin-top: 6px;
+    color: var(--text-muted);
+    font-size: 0.85rem;
+  }
+
+  .form-input {
+    width: 100%;
+    padding: 10px 14px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-sm);
+    color: var(--text-primary);
+    font-size: 0.95rem;
+    transition: all 0.2s ease;
+  }
+
+  .form-input:focus {
+    outline: none;
+    border-color: var(--accent-secondary);
+    background: var(--bg-primary);
   }
 </style>

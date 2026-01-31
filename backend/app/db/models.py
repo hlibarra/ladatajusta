@@ -99,6 +99,17 @@ class Publication(Base):
 
     embedding: Mapped[list[float] | None] = mapped_column(Vector(384), nullable=True)
 
+    # Featured publications
+    is_featured: Mapped[bool] = mapped_column(default=False, index=True)
+    featured_order: Mapped[int | None] = mapped_column(Integer, nullable=True)
+
+    # Media coverage intensity (1-5 scale)
+    pulso_informativo: Mapped[int | None] = mapped_column(Integer, nullable=True)
+
+    # Origin type: how the publication was created
+    # Values: "detected_media" (from scraping), "editorial_ia" (AI editorial), etc.
+    origin_type: Mapped[str | None] = mapped_column(String(50), nullable=True, index=True)
+
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.utcnow())
     published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
@@ -154,6 +165,107 @@ class RSSFeed(Base):
     error_count: Mapped[int] = mapped_column(default=0)
     last_error: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.utcnow())
+
+
+class Section(Base):
+    """Navigation sections that group multiple categories"""
+    __tablename__ = "sections"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    name: Mapped[str] = mapped_column(String(100), unique=True)
+    slug: Mapped[str] = mapped_column(String(100), unique=True, index=True)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    icon: Mapped[str | None] = mapped_column(String(50), nullable=True)  # Icon name for UI
+    display_order: Mapped[int] = mapped_column(Integer, default=0)
+    is_active: Mapped[bool] = mapped_column(default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.utcnow())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.utcnow(), onupdate=lambda: datetime.utcnow())
+
+    # Relationship to category mappings
+    category_mappings: Mapped[list["CategorySectionMapping"]] = relationship(back_populates="section", cascade="all, delete-orphan")
+
+    __table_args__ = (
+        Index('idx_sections_order', 'display_order', 'is_active'),
+    )
+
+
+class CategorySectionMapping(Base):
+    """Maps publication categories to navigation sections (many-to-many)"""
+    __tablename__ = "category_section_mapping"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    section_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("sections.id", ondelete="CASCADE"), index=True
+    )
+    category_name: Mapped[str] = mapped_column(String(80))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.utcnow())
+
+    # Relationship to section
+    section: Mapped["Section"] = relationship(back_populates="category_mappings")
+
+    __table_args__ = (
+        UniqueConstraint("section_id", "category_name", name="uq_section_category"),
+        Index('idx_category_section_mapping_section', 'section_id'),
+        Index('idx_category_section_mapping_category', 'category_name'),
+    )
+
+
+class ScrapingSource(Base):
+    """
+    Configuration and management of scraping sources (media outlets).
+    Each source represents a media outlet that can be scraped.
+    """
+    __tablename__ = "scraping_sources"
+
+    # Primary key
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+
+    # Source identification
+    name: Mapped[str] = mapped_column(String(100), unique=True)
+    slug: Mapped[str] = mapped_column(String(100), unique=True, index=True)
+    media_type: Mapped[str] = mapped_column(String(50), index=True)
+
+    # Configuration
+    is_active: Mapped[bool] = mapped_column(default=False, index=True)
+    scraper_type: Mapped[str] = mapped_column(String(50), default="web")
+    base_url: Mapped[str] = mapped_column(Text)
+
+    # Scraping settings
+    sections_to_scrape: Mapped[list[str] | None] = mapped_column(ARRAY(String), nullable=True, default=list)
+    scraping_interval_minutes: Mapped[int | None] = mapped_column(Integer, default=60, nullable=True)
+    max_articles_per_run: Mapped[int | None] = mapped_column(Integer, default=50, nullable=True)
+
+    # Scraper script configuration
+    scraper_script_path: Mapped[str | None] = mapped_column(Text, nullable=True)
+    scraper_config: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+
+    # AI processing configuration
+    ai_prompt: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    # Status tracking
+    last_scraped_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
+    last_scrape_status: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    last_scrape_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    last_scrape_items_count: Mapped[int] = mapped_column(Integer, default=0)
+
+    # Statistics
+    total_items_scraped: Mapped[int] = mapped_column(Integer, default=0)
+    total_scrape_runs: Mapped[int] = mapped_column(Integer, default=0)
+    success_rate: Mapped[Decimal | None] = mapped_column(Numeric(5, 2), nullable=True)
+
+    # Error handling
+    consecutive_errors: Mapped[int] = mapped_column(Integer, default=0)
+    max_consecutive_errors: Mapped[int] = mapped_column(Integer, default=5)
+
+    # Audit fields
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.utcnow())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.utcnow(), onupdate=lambda: datetime.utcnow())
+    created_by: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    updated_by: Mapped[str | None] = mapped_column(String(100), nullable=True)
+
+    # Metadata
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    extra_metadata: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
 
 
 class ScrapingItem(Base):
@@ -244,3 +356,18 @@ class ScrapingItem(Base):
         Index('idx_scraping_items_media_date', 'source_media', 'article_date'),
         Index('idx_scraping_items_status_updated', 'status', 'status_updated_at'),
     )
+
+
+class SiteConfig(Base):
+    """
+    Dynamic site configuration stored in database.
+    Allows changing display and feature settings without code changes.
+    """
+    __tablename__ = "site_config"
+
+    key: Mapped[str] = mapped_column(String(100), primary_key=True)
+    value: Mapped[dict] = mapped_column(JSONB, default=dict)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    category: Mapped[str] = mapped_column(String(50), default="general")
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.utcnow())
+    updated_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)

@@ -1,0 +1,426 @@
+---
+import Layout from '../../layouts/Layout.astro';
+
+const { slug } = Astro.params;
+const API_BASE = import.meta.env.PUBLIC_API_BASE_URL || 'http://localhost:8000';
+
+interface Publication {
+	id: string;
+	title: string;
+	slug: string;
+	summary: string;
+	category?: string | null;
+	published_at?: string | null;
+	created_at: string;
+	content_sin_vueltas?: string | null;
+	pulso_informativo?: number | null;
+}
+
+interface Section {
+	id: string;
+	name: string;
+	slug: string;
+	description?: string | null;
+	icon?: string | null;
+}
+
+let section: Section | null = null;
+let publications: Publication[] = [];
+let error = false;
+
+try {
+	const response = await fetch(`${API_BASE}/api/sections/${slug}/publications?limit=30`);
+	if (response.ok) {
+		const data = await response.json();
+		section = data.section;
+		publications = data.publications || [];
+	} else if (response.status === 404) {
+		return Astro.redirect('/404');
+	} else {
+		error = true;
+	}
+} catch (e) {
+	error = true;
+}
+
+if (!section) {
+	return Astro.redirect('/404');
+}
+
+// Helper para tiempo relativo
+function getTimeAgo(dateString: string): string {
+	const date = new Date(dateString);
+	const now = new Date();
+	const diffMs = now.getTime() - date.getTime();
+	const diffMins = Math.floor(diffMs / 60000);
+	const diffHours = Math.floor(diffMins / 60);
+	const diffDays = Math.floor(diffHours / 24);
+
+	if (diffMins < 60) return `hace ${diffMins} min`;
+	if (diffHours < 24) return `hace ${diffHours}h`;
+	if (diffDays === 1) return 'ayer';
+	if (diffDays < 7) return `hace ${diffDays} días`;
+	return date.toLocaleDateString('es-AR', { day: 'numeric', month: 'short' });
+}
+
+// Mapeo de pulso informativo a estado editorial
+function getEditorialState(pulso: number | null | undefined): string | null {
+	if (!pulso) return null;
+	const states: Record<number, string> = {
+		1: 'estabilidad',
+		2: 'incertidumbre',
+		3: 'tensión',
+		4: 'impacto',
+		5: 'cierre'
+	};
+	return states[pulso] || null;
+}
+
+// Primera publicación destacada, resto en lista
+const mainStory = publications[0] || null;
+const moreStories = publications.slice(1);
+
+const title = `${section.name} - La Data Justa`;
+---
+
+<Layout title={title}>
+	{error ? (
+		<div class="error-state">
+			<p>No se pudo cargar la sección.</p>
+			<a href="/" class="back-link">Volver al inicio</a>
+		</div>
+	) : (
+		<main class="section-page">
+			<a href="/" class="back-nav">
+				<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+					<path d="M19 12H5M12 19l-7-7 7-7"/>
+				</svg>
+				Inicio
+			</a>
+
+			<header class="section-header">
+				<h1 class="section-title">{section.name}</h1>
+			</header>
+
+			{publications.length === 0 ? (
+				<div class="empty-state">
+					<p>No hay publicaciones en esta sección todavía.</p>
+				</div>
+			) : (
+				<>
+					{/* Noticia principal de la sección */}
+					{mainStory && (
+						<article class="main-story">
+							<header class="story-meta">
+								{getEditorialState(mainStory.pulso_informativo) && (
+									<span class="editorial-state">{getEditorialState(mainStory.pulso_informativo)}</span>
+								)}
+								<time class="time">{getTimeAgo(mainStory.published_at || mainStory.created_at)}</time>
+							</header>
+							<h2 class="main-title">
+								<a href={`/p/${mainStory.slug}`}>{mainStory.title}</a>
+							</h2>
+							<p class="main-summary">{mainStory.content_sin_vueltas || mainStory.summary}</p>
+						</article>
+					)}
+
+					{/* Más noticias de la sección */}
+					{moreStories.length > 0 && (
+						<section class="more-stories">
+							<div class="stories-list">
+								{moreStories.map((story) => (
+									<article class="story-entry">
+										<header class="story-meta">
+											{getEditorialState(story.pulso_informativo) && (
+												<span class="editorial-state">{getEditorialState(story.pulso_informativo)}</span>
+											)}
+											<time class="time">{getTimeAgo(story.published_at || story.created_at)}</time>
+										</header>
+										<h3 class="story-title">
+											<a href={`/p/${story.slug}`}>{story.title}</a>
+										</h3>
+										<p class="story-summary">{story.content_sin_vueltas || story.summary}</p>
+									</article>
+								))}
+							</div>
+						</section>
+					)}
+				</>
+			)}
+
+		</main>
+	)}
+</Layout>
+
+<style>
+	/* ===== BASE ===== */
+	.section-page {
+		max-width: 720px;
+		margin: 0 auto;
+		padding: 0 20px;
+	}
+
+	.error-state,
+	.empty-state {
+		text-align: center;
+		padding: 80px 20px;
+		color: var(--text-muted);
+	}
+
+	.error-state .back-link {
+		display: inline-block;
+		margin-top: 16px;
+		color: var(--accent-main);
+	}
+
+	/* ===== NAVEGACIÓN ===== */
+	.back-nav {
+		display: inline-flex;
+		align-items: center;
+		gap: 6px;
+		color: var(--text-muted);
+		font-size: 0.85rem;
+		margin-bottom: 32px;
+		transition: color 0.2s;
+	}
+
+	.back-nav:hover {
+		color: var(--accent-main);
+	}
+
+	/* ===== HEADER DE SECCIÓN ===== */
+	.section-header {
+		margin-bottom: 48px;
+		padding-bottom: 32px;
+		border-bottom: 1px solid var(--border-subtle);
+		border-left: 4px solid var(--accent-section);
+		padding-left: 24px;
+		margin-left: -24px;
+	}
+
+	.section-title {
+		font-size: clamp(2rem, 6vw, 3rem);
+		font-weight: 700;
+		line-height: 1.1;
+		letter-spacing: -0.03em;
+		margin: 0;
+		color: var(--text-primary);
+		text-transform: capitalize;
+	}
+
+	/* ===== NOTICIA PRINCIPAL ===== */
+	.main-story {
+		padding: 0 0 48px;
+		margin-bottom: 48px;
+		border-bottom: 1px solid var(--border-subtle);
+		border-left: 3px solid var(--accent-main);
+		padding-left: 24px;
+		margin-left: -24px;
+	}
+
+	.main-title {
+		font-size: clamp(1.5rem, 4vw, 2rem);
+		font-weight: 700;
+		line-height: 1.2;
+		letter-spacing: -0.02em;
+		margin: 0 0 16px;
+		color: var(--text-primary);
+	}
+
+	.main-title a {
+		color: inherit;
+		text-decoration: none;
+	}
+
+	.main-title a:hover {
+		color: var(--text-secondary);
+	}
+
+	.main-summary {
+		font-size: 1.0625rem;
+		line-height: 1.65;
+		color: var(--text-secondary);
+		margin: 0;
+		max-width: 600px;
+	}
+
+	/* ===== METADATOS ===== */
+	.story-meta {
+		display: flex;
+		align-items: baseline;
+		gap: 0;
+		margin-bottom: 10px;
+		font-size: 0.8rem;
+		color: var(--text-muted);
+	}
+
+	.editorial-state {
+		color: var(--text-muted);
+	}
+
+	.editorial-state::after {
+		content: '·';
+		margin: 0 10px;
+		opacity: 0.5;
+	}
+
+	.time {
+		color: var(--text-muted);
+		opacity: 0.8;
+	}
+
+	/* ===== LISTA DE NOTICIAS ===== */
+	.more-stories {
+		padding-bottom: 48px;
+	}
+
+	.stories-list {
+		display: flex;
+		flex-direction: column;
+	}
+
+	.story-entry {
+		padding: 32px 0;
+		border-bottom: 1px solid var(--border-subtle);
+		border-left: 2px solid transparent;
+		padding-left: 20px;
+		margin-left: -20px;
+		transition: border-color 0.2s ease;
+	}
+
+	.story-entry:first-child {
+		padding-top: 0;
+	}
+
+	.story-entry:last-child {
+		border-bottom: none;
+	}
+
+	.story-entry:hover {
+		border-left-color: var(--accent-recent);
+	}
+
+	.story-title {
+		font-size: 1.2rem;
+		font-weight: 600;
+		line-height: 1.35;
+		letter-spacing: -0.01em;
+		margin: 0 0 10px;
+		color: var(--text-primary);
+	}
+
+	.story-title a {
+		color: inherit;
+		text-decoration: none;
+	}
+
+	.story-title a:hover {
+		color: var(--text-secondary);
+	}
+
+	.story-summary {
+		font-size: 0.95rem;
+		line-height: 1.6;
+		color: var(--text-secondary);
+		margin: 0;
+		display: -webkit-box;
+		-webkit-line-clamp: 2;
+		-webkit-box-orient: vertical;
+		overflow: hidden;
+	}
+
+	/* ===== AVISO ===== */
+	.site-notice {
+		padding: 32px 0 48px;
+		border-top: 1px solid var(--border-subtle);
+	}
+
+	.site-notice p {
+		font-size: 0.8rem;
+		line-height: 1.6;
+		color: var(--text-muted);
+		margin: 0;
+		max-width: 480px;
+		opacity: 0.7;
+	}
+
+	/* ===== COLORES ===== */
+	:root {
+		--accent-muted: #6b7280;
+		--accent-main: #64748b;
+		--accent-recent: #64748b;
+		--accent-section: #94a3b8;
+	}
+
+	@media (prefers-color-scheme: dark) {
+		:root {
+			--accent-muted: #9ca3af;
+			--accent-main: #94a3b8;
+			--accent-recent: #94a3b8;
+			--accent-section: #cbd5e1;
+		}
+	}
+
+	/* ===== RESPONSIVE ===== */
+	@media (max-width: 640px) {
+		.section-page {
+			padding: 0 16px;
+		}
+
+		.back-nav {
+			margin-bottom: 24px;
+		}
+
+		.section-header {
+			margin-bottom: 32px;
+			padding-bottom: 24px;
+			padding-left: 16px;
+			margin-left: -16px;
+		}
+
+		.section-title {
+			font-size: 1.75rem;
+		}
+
+		.section-description {
+			font-size: 1rem;
+		}
+
+		.main-story {
+			padding-bottom: 32px;
+			margin-bottom: 32px;
+			padding-left: 16px;
+			margin-left: -16px;
+		}
+
+		.main-title {
+			font-size: 1.35rem;
+		}
+
+		.main-summary {
+			font-size: 1rem;
+		}
+
+		.story-entry {
+			padding: 24px 0;
+			padding-left: 14px;
+			margin-left: -14px;
+		}
+
+		.story-title {
+			font-size: 1.05rem;
+		}
+
+		.story-summary {
+			font-size: 0.9rem;
+		}
+
+		.site-notice {
+			padding: 24px 0 40px;
+		}
+
+		.site-notice p {
+			font-size: 0.75rem;
+		}
+	}
+</style>

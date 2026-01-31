@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
+from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class ScrapeRequest(BaseModel):
@@ -56,6 +57,13 @@ class PublicationOut(BaseModel):
     # Multimedia
     media: list[MediaItem] = []
     image_url: str | None = None  # First image URL from media array
+    # Featured
+    is_featured: bool = False
+    featured_order: int | None = None
+    # Media coverage intensity
+    pulso_informativo: int | None = None
+    # Origin type
+    origin_type: str | None = None
 
 
 class VoteRequest(BaseModel):
@@ -78,6 +86,7 @@ class PublicationUpdate(BaseModel):
     content_lo_central: str | None = None
     content_en_profundidad: str | None = None
     media: list[MediaItem] | None = None
+    pulso_informativo: int | None = Field(None, ge=1, le=5)
 
 
 class StateChange(BaseModel):
@@ -184,9 +193,9 @@ class ScrapingItemOut(BaseModel):
     content: str
     author: str | None
     article_date: datetime | None
-    tags: list[str]
-    image_urls: list[str]
-    video_urls: list[str]
+    tags: list[str] | None = None
+    image_urls: list[str] | None = None
+    video_urls: list[str] | None = None
 
     # Hashes
     content_hash: str
@@ -206,7 +215,7 @@ class ScrapingItemOut(BaseModel):
     # AI data
     ai_title: str | None
     ai_summary: str | None
-    ai_tags: list[str] | None
+    ai_tags: list[str] | None = None
     ai_category: str | None
     ai_model: str | None
     ai_processed_at: datetime | None
@@ -224,6 +233,12 @@ class ScrapingItemOut(BaseModel):
     # Audit
     created_at: datetime
     updated_at: datetime
+
+    @field_validator('tags', 'image_urls', 'video_urls', mode='after')
+    @classmethod
+    def empty_list_if_none(cls, v: list[str] | None) -> list[str]:
+        """Convert None to empty list for array fields"""
+        return v if v is not None else []
 
 
 class ScrapingItemOutDetailed(ScrapingItemOut):

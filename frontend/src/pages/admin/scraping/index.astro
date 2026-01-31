@@ -44,24 +44,60 @@ import AdminLayout from '../../../layouts/AdminLayout.astro';
         </svg>
       </div>
       <div class="stat-content">
-        <span class="stat-value" id="stat-published">-</span>
-        <span class="stat-label">Publicados</span>
+        <span class="stat-value" id="stat-ai-completed">-</span>
+        <span class="stat-label">IA Completados</span>
       </div>
     </div>
 
     <div class="stat-card">
-      <div class="stat-icon error">
+      <div class="stat-icon published">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="24" height="24">
-          <circle cx="12" cy="12" r="10"></circle>
-          <line x1="12" y1="8" x2="12" y2="12"></line>
-          <line x1="12" y1="16" x2="12.01" y2="16"></line>
+          <path d="M22 2L11 13"></path>
+          <path d="M22 2L15 22L11 13L2 9L22 2Z"></path>
         </svg>
       </div>
       <div class="stat-content">
-        <span class="stat-value" id="stat-errors">-</span>
-        <span class="stat-label">Con errores</span>
+        <span class="stat-value" id="stat-published">-</span>
+        <span class="stat-label">Publicados</span>
       </div>
     </div>
+  </div>
+
+  <!-- Date Quick Filters -->
+  <div class="date-filters">
+    <button id="filter-today" class="date-filter-btn active">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+        <circle cx="12" cy="12" r="10"></circle>
+        <polyline points="12 6 12 12 16 14"></polyline>
+      </svg>
+      Hoy
+    </button>
+    <button id="filter-yesterday" class="date-filter-btn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+        <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+        <line x1="16" y1="2" x2="16" y2="6"></line>
+        <line x1="8" y1="2" x2="8" y2="6"></line>
+        <line x1="3" y1="10" x2="21" y2="10"></line>
+      </svg>
+      Ayer
+    </button>
+    <button id="filter-week" class="date-filter-btn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+        <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+        <line x1="16" y1="2" x2="16" y2="6"></line>
+        <line x1="8" y1="2" x2="8" y2="6"></line>
+        <line x1="3" y1="10" x2="21" y2="10"></line>
+      </svg>
+      Esta semana
+    </button>
+    <button id="filter-all-dates" class="date-filter-btn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+        <circle cx="12" cy="12" r="10"></circle>
+        <line x1="2" y1="12" x2="22" y2="12"></line>
+        <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+      </svg>
+      Todos
+    </button>
   </div>
 
   <!-- Filters -->
@@ -71,15 +107,11 @@ import AdminLayout from '../../../layouts/AdminLayout.astro';
       <select id="filter-status" class="filter-select">
         <option value="">Todos</option>
         <option value="scraped">Scrapeado</option>
-        <option value="pending_review">Pendiente revisión</option>
         <option value="ready_for_ai">Listo para IA</option>
-        <option value="processing_ai">Procesando IA</option>
-        <option value="ai_completed">IA completado</option>
+        <option value="ai_completed" selected>IA completado</option>
         <option value="ready_to_publish">Listo para publicar</option>
         <option value="published">Publicado</option>
-        <option value="discarded">Descartado</option>
         <option value="error">Error</option>
-        <option value="duplicate">Duplicado</option>
       </select>
     </div>
 
@@ -88,12 +120,9 @@ import AdminLayout from '../../../layouts/AdminLayout.astro';
       <select id="filter-media" class="filter-select">
         <option value="">Todos</option>
         <option value="lagaceta">La Gaceta</option>
-        <option value="clarin">Clarín</option>
         <option value="infobae">Infobae</option>
-        <option value="lanacion">La Nación</option>
         <option value="pagina12">Página 12</option>
-        <option value="perfil">Perfil</option>
-        <option value="other">Otros</option>
+        <option value="clarin">Clarín</option>
       </select>
     </div>
 
@@ -123,7 +152,7 @@ import AdminLayout from '../../../layouts/AdminLayout.astro';
   <!-- Items Table -->
   <div class="card">
     <div class="table-header">
-      <h3 class="card-title">Items Scrapeados</h3>
+      <h3 class="card-title">Items Procesados</h3>
       <div class="table-actions">
         <button id="btn-refresh" class="btn btn-secondary btn-sm">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
@@ -156,6 +185,7 @@ import AdminLayout from '../../../layouts/AdminLayout.astro';
             <th style="width: 100px;">Estado</th>
             <th style="width: 120px;">Medio</th>
             <th>Título</th>
+            <th style="width: 120px;">Categoría</th>
             <th style="width: 140px;">Fecha</th>
             <th style="width: 180px;">Acciones</th>
           </tr>
@@ -178,88 +208,6 @@ import AdminLayout from '../../../layouts/AdminLayout.astro';
     </div>
   </div>
 
-  <!-- Modal for item details -->
-  <div id="item-modal" class="modal" style="display: none;">
-    <div class="modal-content modal-large">
-      <div class="modal-header">
-        <h2 id="modal-title">Detalles del Item</h2>
-        <button id="modal-close" class="modal-close">&times;</button>
-      </div>
-      <div class="modal-body" id="modal-body">
-        <!-- Populated by JS -->
-      </div>
-      <div class="modal-footer">
-        <button id="modal-close-btn" class="btn btn-secondary">Cerrar</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Modal for publishing -->
-  <div id="publish-modal" class="modal" style="display: none;">
-    <div class="modal-content modal-large">
-      <div class="modal-header">
-        <h2>Publicar Item</h2>
-        <button id="publish-modal-close" class="modal-close">&times;</button>
-      </div>
-      <div class="modal-body" id="publish-modal-body">
-        <div class="publish-preview">
-          <div class="alert alert-info">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
-              <circle cx="12" cy="12" r="10"></circle>
-              <line x1="12" y1="16" x2="12" y2="12"></line>
-              <line x1="12" y1="8" x2="12.01" y2="8"></line>
-            </svg>
-            <p>Estás por crear una publicación con este contenido. Revisa los datos antes de confirmar.</p>
-          </div>
-
-          <div class="detail-section">
-            <h3>Contenido a Publicar</h3>
-            <div class="detail-field">
-              <strong>Título:</strong>
-              <p id="publish-title">-</p>
-            </div>
-            <div class="detail-field">
-              <strong>Resumen:</strong>
-              <p id="publish-summary">-</p>
-            </div>
-            <div class="detail-field">
-              <strong>Contenido:</strong>
-              <div class="content-preview" id="publish-content">-</div>
-            </div>
-            <div class="detail-field">
-              <strong>Medio:</strong>
-              <p id="publish-source">-</p>
-            </div>
-            <div class="detail-field">
-              <strong>Tags:</strong>
-              <div class="tags-list" id="publish-tags"></div>
-            </div>
-          </div>
-
-          <div class="detail-section">
-            <h3>Opciones de Publicación</h3>
-            <div class="form-group">
-              <label class="form-label" for="publish-agent">Agente (opcional):</label>
-              <select id="publish-agent" class="form-select">
-                <option value="">Sin agente</option>
-                <!-- Se llena dinámicamente -->
-              </select>
-            </div>
-          </div>
-        </div>
-      </div>
-      <div class="modal-footer">
-        <button id="publish-cancel-btn" class="btn btn-secondary">Cancelar</button>
-        <button id="publish-confirm-btn" class="btn btn-success">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
-            <path d="M22 2L11 13"></path>
-            <path d="M22 2L15 22L11 13L2 9L22 2Z"></path>
-          </svg>
-          Publicar Ahora
-        </button>
-      </div>
-    </div>
-  </div>
 </AdminLayout>
 
 <script>
@@ -284,6 +232,8 @@ import AdminLayout from '../../../layouts/AdminLayout.astro';
     ai_title: string | null;
     ai_summary: string | null;
     ai_category: string | null;
+    ai_tags: string[] | null;
+    ai_metadata: any;
     retry_count: number;
     last_error: string | null;
     publication_id: string | null;
@@ -293,9 +243,10 @@ import AdminLayout from '../../../layouts/AdminLayout.astro';
   const pageSize = 20;
   let totalItems = 0;
   let currentFilters = {
-    status: '',
-    source_media: '',
+    status: 'ai_completed',
+    source_media: 'lagaceta',
     search_text: '',
+    date_filter: 'today',
   };
 
   // Load stats
@@ -308,8 +259,8 @@ import AdminLayout from '../../../layouts/AdminLayout.astro';
 
       document.getElementById('stat-scraped')!.textContent = String(data.by_status.scraped || 0);
       document.getElementById('stat-ready-ai')!.textContent = String(data.items_ready_for_ai || 0);
+      document.getElementById('stat-ai-completed')!.textContent = String(data.by_status.ai_completed || 0);
       document.getElementById('stat-published')!.textContent = String(data.by_status.published || 0);
-      document.getElementById('stat-errors')!.textContent = String(data.items_with_errors || 0);
     } catch (e) {
       console.error('Error loading stats:', e);
     }
@@ -338,6 +289,26 @@ import AdminLayout from '../../../layouts/AdminLayout.astro';
       if (currentFilters.source_media) params.append('source_media', currentFilters.source_media);
       if (currentFilters.search_text) params.append('search_text', currentFilters.search_text);
 
+      // Add date filter
+      if (currentFilters.date_filter && currentFilters.date_filter !== 'all') {
+        const now = new Date();
+        let fromDate: Date;
+
+        if (currentFilters.date_filter === 'today') {
+          fromDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        } else if (currentFilters.date_filter === 'yesterday') {
+          fromDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+          const toDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+          params.append('date_to', toDate.toISOString());
+        } else if (currentFilters.date_filter === 'week') {
+          fromDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 7);
+        } else {
+          fromDate = new Date(0); // All time
+        }
+
+        params.append('date_from', fromDate.toISOString());
+      }
+
       const response = await authFetch(`/api/scraping-items?${params}`);
       if (!response.ok) throw new Error('Failed to fetch items');
 
@@ -362,21 +333,42 @@ import AdminLayout from '../../../layouts/AdminLayout.astro';
             <span class="media-badge">${getMediaLabel(item.source_media)}</span>
           </td>
           <td>
-            <div class="item-title">${item.title || item.ai_title || '(Sin título)'}</div>
+            <div class="item-title">
+              ${item.ai_title || item.title || '(Sin título)'}
+              ${item.image_urls && item.image_urls.length > 0 ? `
+                <svg class="has-image-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16" title="Tiene ${item.image_urls.length} imagen(es) generada(s)">
+                  <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                  <circle cx="8.5" cy="8.5" r="1.5"/>
+                  <polyline points="21 15 16 10 5 21"/>
+                </svg>
+              ` : ''}
+            </div>
             ${item.source_section ? `<div class="item-section">${item.source_section}</div>` : ''}
+          </td>
+          <td>
+            ${item.ai_category ? `<span class="category-badge">${item.ai_category}</span>` : '<span class="text-muted">-</span>'}
           </td>
           <td>
             <div class="item-date">${formatDate(item.scraped_at)}</div>
           </td>
           <td>
             <div class="action-buttons">
-              <button class="btn-icon" onclick="viewItem('${item.id}')" title="Ver detalles">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+              <button class="action-btn action-btn-view" onclick="viewItem('${item.id}')" title="Ver previsualización">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
                   <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
                   <circle cx="12" cy="12" r="3"></circle>
                 </svg>
+                <span>Ver</span>
               </button>
-              ${getActionButtons(item)}
+              ${item.status === 'ai_completed' || item.status === 'ready_to_publish' ? `
+                <button class="action-btn action-btn-publish" onclick="publishItemQuick('${item.id}')" title="Publicar artículo">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                    <path d="M22 2L11 13"></path>
+                    <path d="M22 2L15 22L11 13L2 9L22 2Z"></path>
+                  </svg>
+                  <span>Publicar</span>
+                </button>
+              ` : ''}
             </div>
           </td>
         </tr>
@@ -396,15 +388,11 @@ import AdminLayout from '../../../layouts/AdminLayout.astro';
   function getStatusLabel(status: string): string {
     const labels: Record<string, string> = {
       scraped: 'Scrapeado',
-      pending_review: 'Pendiente',
       ready_for_ai: 'Listo IA',
-      processing_ai: 'Procesando',
       ai_completed: 'IA OK',
       ready_to_publish: 'Listo',
       published: 'Publicado',
-      discarded: 'Descartado',
       error: 'Error',
-      duplicate: 'Duplicado',
     };
     return labels[status] || status;
   }
@@ -412,63 +400,8 @@ import AdminLayout from '../../../layouts/AdminLayout.astro';
   function getMediaLabel(media: string): string {
     const labels: Record<string, string> = {
       lagaceta: 'La Gaceta',
-      clarin: 'Clarín',
-      infobae: 'Infobae',
-      lanacion: 'La Nación',
-      pagina12: 'Página 12',
-      perfil: 'Perfil',
     };
     return labels[media] || media;
-  }
-
-  function getActionButtons(item: ScrapingItem): string {
-    const buttons = [];
-
-    if (item.status === 'scraped') {
-      buttons.push(`
-        <button class="btn-icon btn-success" onclick="updateStatus('${item.id}', 'ready_for_ai')" title="Marcar listo para IA">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
-            <polyline points="20 6 9 17 4 12"></polyline>
-          </svg>
-        </button>
-      `);
-    }
-
-    if (item.status === 'error') {
-      buttons.push(`
-        <button class="btn-icon btn-warning" onclick="updateStatus('${item.id}', 'ready_for_ai')" title="Reintentar">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
-            <polyline points="23 4 23 10 17 10"></polyline>
-            <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
-          </svg>
-        </button>
-      `);
-    }
-
-    // Botón Publicar - solo si tiene contenido listo
-    if (item.status === 'scraped' || item.status === 'ready_for_ai' || item.status === 'ai_completed' || item.status === 'ready_to_publish') {
-      buttons.push(`
-        <button class="btn-icon btn-publish" onclick="openPublishModal('${item.id}')" title="Publicar">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
-            <path d="M22 2L11 13"></path>
-            <path d="M22 2L15 22L11 13L2 9L22 2Z"></path>
-          </svg>
-        </button>
-      `);
-    }
-
-    if (item.status !== 'published' && item.status !== 'discarded') {
-      buttons.push(`
-        <button class="btn-icon btn-danger" onclick="updateStatus('${item.id}', 'discarded')" title="Descartar">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
-            <line x1="18" y1="6" x2="6" y2="18"></line>
-            <line x1="6" y1="6" x2="18" y2="18"></line>
-          </svg>
-        </button>
-      `);
-    }
-
-    return buttons.join('');
   }
 
   function formatDate(dateStr: string): string {
@@ -483,7 +416,7 @@ import AdminLayout from '../../../layouts/AdminLayout.astro';
     } else if (diffHours < 24) {
       return `Hace ${Math.floor(diffHours)}h`;
     } else {
-      return date.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+      return date.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit' });
     }
   }
 
@@ -501,284 +434,52 @@ import AdminLayout from '../../../layouts/AdminLayout.astro';
     nextBtn.disabled = end >= totalItems;
   }
 
-  // View item details
-  (window as any).viewItem = async function(itemId: string) {
-    const modal = document.getElementById('item-modal')!;
-    const modalBody = document.getElementById('modal-body')!;
-
-    modal.style.display = 'flex';
-    modalBody.innerHTML = '<div class="loading-state"><div class="spinner"></div><p>Cargando...</p></div>';
-
-    try {
-      const response = await authFetch(`/api/scraping-items/${itemId}`);
-      if (!response.ok) throw new Error('Failed to fetch item');
-
-      const item = await response.json();
-
-      modalBody.innerHTML = `
-        <div class="item-details">
-          <div class="detail-section">
-            <h3>Información General</h3>
-            <div class="detail-grid">
-              <div><strong>ID:</strong> ${item.id}</div>
-              <div><strong>Estado:</strong> <span class="status-badge status-${item.status}">${getStatusLabel(item.status)}</span></div>
-              <div><strong>Medio:</strong> ${getMediaLabel(item.source_media)}</div>
-              <div><strong>Sección:</strong> ${item.source_section || 'N/A'}</div>
-              <div><strong>Autor:</strong> ${item.author || 'N/A'}</div>
-              <div><strong>Scrapeado:</strong> ${new Date(item.scraped_at).toLocaleString('es-AR')}</div>
-            </div>
-          </div>
-
-          <div class="detail-section">
-            <h3>Contenido Original</h3>
-            <div class="detail-field">
-              <strong>Título:</strong>
-              <p>${item.title || 'N/A'}</p>
-            </div>
-            ${item.subtitle ? `
-              <div class="detail-field">
-                <strong>Subtítulo:</strong>
-                <p>${item.subtitle}</p>
-              </div>
-            ` : ''}
-            <div class="detail-field">
-              <strong>Resumen:</strong>
-              <p>${item.summary || 'N/A'}</p>
-            </div>
-            <div class="detail-field">
-              <strong>Contenido:</strong>
-              <div class="content-preview">${item.content.substring(0, 500)}${item.content.length > 500 ? '...' : ''}</div>
-            </div>
-            <div class="detail-field">
-              <strong>URL:</strong>
-              <a href="${item.source_url}" target="_blank" rel="noopener">${item.source_url}</a>
-            </div>
-            ${item.tags && item.tags.length > 0 ? `
-              <div class="detail-field">
-                <strong>Tags:</strong>
-                <div class="tags-list">
-                  ${item.tags.map((tag: string) => `<span class="tag">${tag}</span>`).join('')}
-                </div>
-              </div>
-            ` : ''}
-          </div>
-
-          ${item.ai_title || item.ai_summary ? `
-            <div class="detail-section">
-              <h3>Contenido Generado por IA</h3>
-              ${item.ai_title ? `
-                <div class="detail-field">
-                  <strong>Título IA:</strong>
-                  <p>${item.ai_title}</p>
-                </div>
-              ` : ''}
-              ${item.ai_summary ? `
-                <div class="detail-field">
-                  <strong>Resumen IA:</strong>
-                  <p>${item.ai_summary}</p>
-                </div>
-              ` : ''}
-              ${item.ai_category ? `
-                <div class="detail-field">
-                  <strong>Categoría IA:</strong>
-                  <p>${item.ai_category}</p>
-                </div>
-              ` : ''}
-              ${item.ai_model ? `
-                <div class="detail-field">
-                  <strong>Modelo:</strong>
-                  <p>${item.ai_model}</p>
-                </div>
-              ` : ''}
-            </div>
-          ` : ''}
-
-          ${item.last_error ? `
-            <div class="detail-section error-section">
-              <h3>Error</h3>
-              <div class="detail-field">
-                <strong>Mensaje:</strong>
-                <pre class="error-message">${item.last_error}</pre>
-              </div>
-              <div class="detail-field">
-                <strong>Intentos:</strong>
-                <p>${item.retry_count} / ${item.max_retries}</p>
-              </div>
-            </div>
-          ` : ''}
-        </div>
-      `;
-    } catch (e) {
-      console.error('Error loading item:', e);
-      modalBody.innerHTML = '<p class="error-text">Error al cargar detalles del item</p>';
-    }
+  // View item - navigate to edit page
+  (window as any).viewItem = function(itemId: string) {
+    window.location.href = `/admin/scraping/${itemId}`;
   };
 
-  // Update item status
-  (window as any).updateStatus = async function(itemId: string, newStatus: string) {
-    if (!confirm(`¿Cambiar estado a "${getStatusLabel(newStatus)}"?`)) return;
+  // Quick publish
+  (window as any).publishItemQuick = async function(itemId: string) {
+    if (!confirm('¿Publicar este artículo ahora?')) return;
 
     try {
-      const response = await authFetch(`/api/scraping-items/${itemId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: newStatus }),
-      });
-
-      if (!response.ok) throw new Error('Failed to update status');
-
-      await loadItems();
-      await loadStats();
-    } catch (e) {
-      console.error('Error updating status:', e);
-      alert('Error al actualizar el estado');
-    }
-  };
-
-  // ===== PUBLISH FUNCTIONS =====
-
-  let currentPublishItemId: string | null = null;
-  let currentPublishItem: any = null;
-
-  // Open publish modal
-  (window as any).openPublishModal = async function(itemId: string) {
-    currentPublishItemId = itemId;
-
-    const modal = document.getElementById('publish-modal')!;
-    modal.style.display = 'flex';
-
-    // Load item data
-    try {
-      const response = await authFetch(`/api/scraping-items/${itemId}`);
-      if (!response.ok) throw new Error('Failed to fetch item');
-
-      currentPublishItem = await response.json();
-
-      // Populate preview
-      const title = currentPublishItem.ai_title || currentPublishItem.title || '(Sin título)';
-      const summary = currentPublishItem.ai_summary || currentPublishItem.summary || '(Sin resumen)';
-      const content = currentPublishItem.content;
-      const source = getMediaLabel(currentPublishItem.source_media);
-      const tags = currentPublishItem.ai_tags || currentPublishItem.tags || [];
-
-      document.getElementById('publish-title')!.textContent = title;
-      document.getElementById('publish-summary')!.textContent = summary;
-      document.getElementById('publish-content')!.textContent = content.substring(0, 500) + (content.length > 500 ? '...' : '');
-      document.getElementById('publish-source')!.textContent = source;
-
-      const tagsContainer = document.getElementById('publish-tags')!;
-      if (tags.length > 0) {
-        tagsContainer.innerHTML = tags.map((tag: string) => `<span class="tag">${tag}</span>`).join('');
-      } else {
-        tagsContainer.innerHTML = '<span class="text-muted">Sin tags</span>';
-      }
-
-      // Load agents
-      await loadAgents();
-
-    } catch (e) {
-      console.error('Error loading item for publish:', e);
-      alert('Error al cargar el item');
-      modal.style.display = 'none';
-    }
-  };
-
-  // Load agents for selection
-  async function loadAgents() {
-    try {
-      const response = await authFetch('/api/agents');
-      if (!response.ok) return;
-
-      const agents = await response.json();
-      const select = document.getElementById('publish-agent') as HTMLSelectElement;
-
-      // Clear existing options (except first)
-      while (select.options.length > 1) {
-        select.remove(1);
-      }
-
-      // Add agents
-      agents.forEach((agent: any) => {
-        const option = document.createElement('option');
-        option.value = agent.id;
-        option.textContent = agent.name;
-        select.appendChild(option);
-      });
-    } catch (e) {
-      console.error('Error loading agents:', e);
-    }
-  }
-
-  // Publish item
-  async function publishItem() {
-    if (!currentPublishItemId) return;
-
-    const confirmBtn = document.getElementById('publish-confirm-btn') as HTMLButtonElement;
-    confirmBtn.disabled = true;
-    confirmBtn.textContent = 'Publicando...';
-
-    try {
-      const agentSelect = document.getElementById('publish-agent') as HTMLSelectElement;
-      const agentValue = agentSelect.value;
-
-      // Prepare request body - all fields as null if not provided
-      const requestBody = {
-        agent_id: agentValue || null,
-        override_title: null,
-        override_summary: null,
-        override_body: null
-      };
-
-      console.log('Publishing item:', currentPublishItemId);
-      console.log('Request body:', requestBody);
-      console.log('Request body JSON:', JSON.stringify(requestBody));
-
-      const response = await authFetch(`/api/scraping-items/${currentPublishItemId}/publish`, {
+      const response = await authFetch(`/api/scraping-items/${itemId}/publish`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(requestBody),
+        body: JSON.stringify({ agent_id: null, override_title: null, override_summary: null, override_body: null }),
       });
-
-      console.log('Response status:', response.status);
-      console.log('Response ok:', response.ok);
 
       if (!response.ok) {
         const errorText = await response.text();
-        console.error('Error response:', errorText);
-        let errorDetail = 'Error al publicar';
-        try {
-          const errorJson = JSON.parse(errorText);
-          errorDetail = errorJson.detail || JSON.stringify(errorJson);
-        } catch {
-          errorDetail = errorText;
-        }
-        throw new Error(errorDetail);
+        throw new Error(errorText);
       }
 
       const result = await response.json();
+      alert(`¡Publicación creada exitosamente!\n\nSlug: ${result.slug}`);
 
-      // Close modal
-      document.getElementById('publish-modal')!.style.display = 'none';
+      // Close modal if open
+      const modal = document.getElementById('item-modal')!;
+      if (modal.style.display === 'flex') {
+        modal.style.display = 'none';
+      }
 
-      // Show success message
-      alert(`¡Publicación creada exitosamente!\n\nSlug: ${result.slug}\nID: ${result.publication_id}`);
-
-      // Reload items and stats
       await loadItems();
       await loadStats();
-
     } catch (e: any) {
       console.error('Error publishing:', e);
       alert(`Error al publicar: ${e.message}`);
-    } finally {
-      confirmBtn.disabled = false;
-      confirmBtn.innerHTML = `
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
-          <path d="M22 2L11 13"></path>
-          <path d="M22 2L15 22L11 13L2 9L22 2Z"></path>
-        </svg>
-        Publicar Ahora
-      `;
+    }
+  };
+
+  // Update date filter buttons UI
+  function updateDateFilterUI(activeFilter: string) {
+    document.querySelectorAll('.date-filter-btn').forEach(btn => {
+      btn.classList.remove('active');
+    });
+    const activeBtn = document.getElementById(`filter-${activeFilter === 'all' ? 'all-dates' : activeFilter}`);
+    if (activeBtn) {
+      activeBtn.classList.add('active');
     }
   }
 
@@ -786,6 +487,35 @@ import AdminLayout from '../../../layouts/AdminLayout.astro';
   document.addEventListener('DOMContentLoaded', () => {
     loadStats();
     loadItems();
+
+    // Date filter buttons
+    document.getElementById('filter-today')!.addEventListener('click', () => {
+      currentFilters.date_filter = 'today';
+      updateDateFilterUI('today');
+      currentPage = 0;
+      loadItems();
+    });
+
+    document.getElementById('filter-yesterday')!.addEventListener('click', () => {
+      currentFilters.date_filter = 'yesterday';
+      updateDateFilterUI('yesterday');
+      currentPage = 0;
+      loadItems();
+    });
+
+    document.getElementById('filter-week')!.addEventListener('click', () => {
+      currentFilters.date_filter = 'week';
+      updateDateFilterUI('week');
+      currentPage = 0;
+      loadItems();
+    });
+
+    document.getElementById('filter-all-dates')!.addEventListener('click', () => {
+      currentFilters.date_filter = 'all';
+      updateDateFilterUI('all');
+      currentPage = 0;
+      loadItems();
+    });
 
     document.getElementById('btn-apply-filters')!.addEventListener('click', () => {
       currentFilters.status = (document.getElementById('filter-status') as HTMLSelectElement).value;
@@ -799,7 +529,8 @@ import AdminLayout from '../../../layouts/AdminLayout.astro';
       (document.getElementById('filter-status') as HTMLSelectElement).value = '';
       (document.getElementById('filter-media') as HTMLSelectElement).value = '';
       (document.getElementById('filter-search') as HTMLInputElement).value = '';
-      currentFilters = { status: '', source_media: '', search_text: '' };
+      currentFilters = { status: '', source_media: '', search_text: '', date_filter: 'today' };
+      updateDateFilterUI('today');
       currentPage = 0;
       loadItems();
     });
@@ -820,41 +551,6 @@ import AdminLayout from '../../../layouts/AdminLayout.astro';
       if ((currentPage + 1) * pageSize < totalItems) {
         currentPage++;
         loadItems();
-      }
-    });
-
-    document.getElementById('modal-close')!.addEventListener('click', () => {
-      document.getElementById('item-modal')!.style.display = 'none';
-    });
-
-    document.getElementById('modal-close-btn')!.addEventListener('click', () => {
-      document.getElementById('item-modal')!.style.display = 'none';
-    });
-
-    // Close modal on outside click
-    document.getElementById('item-modal')!.addEventListener('click', (e) => {
-      if (e.target === document.getElementById('item-modal')) {
-        document.getElementById('item-modal')!.style.display = 'none';
-      }
-    });
-
-    // Publish modal event listeners
-    document.getElementById('publish-modal-close')!.addEventListener('click', () => {
-      document.getElementById('publish-modal')!.style.display = 'none';
-    });
-
-    document.getElementById('publish-cancel-btn')!.addEventListener('click', () => {
-      document.getElementById('publish-modal')!.style.display = 'none';
-    });
-
-    document.getElementById('publish-confirm-btn')!.addEventListener('click', () => {
-      publishItem();
-    });
-
-    // Close publish modal on outside click
-    document.getElementById('publish-modal')!.addEventListener('click', (e) => {
-      if (e.target === document.getElementById('publish-modal')) {
-        document.getElementById('publish-modal')!.style.display = 'none';
       }
     });
   });
@@ -887,25 +583,10 @@ import AdminLayout from '../../../layouts/AdminLayout.astro';
     justify-content: center;
   }
 
-  .stat-icon.scraped {
-    background: rgba(139, 92, 246, 0.15);
-    color: #8b5cf6;
-  }
-
-  .stat-icon.ready {
-    background: rgba(59, 130, 246, 0.15);
-    color: var(--accent-secondary);
-  }
-
-  .stat-icon.completed {
-    background: rgba(16, 185, 129, 0.15);
-    color: var(--success);
-  }
-
-  .stat-icon.error {
-    background: rgba(239, 68, 68, 0.15);
-    color: var(--error);
-  }
+  .stat-icon.scraped { background: rgba(139, 92, 246, 0.15); color: #8b5cf6; }
+  .stat-icon.ready { background: rgba(59, 130, 246, 0.15); color: var(--accent-secondary); }
+  .stat-icon.completed { background: rgba(34, 197, 94, 0.15); color: #22c55e; }
+  .stat-icon.published { background: rgba(16, 185, 129, 0.15); color: var(--success); }
 
   .stat-content {
     display: flex;
@@ -921,6 +602,51 @@ import AdminLayout from '../../../layouts/AdminLayout.astro';
   .stat-label {
     font-size: 0.85rem;
     color: var(--text-muted);
+  }
+
+  /* Date Quick Filters */
+  .date-filters {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+  }
+
+  .date-filter-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 18px;
+    background: var(--bg-card);
+    border: 2px solid var(--border-subtle);
+    border-radius: 24px;
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .date-filter-btn:hover {
+    background: var(--bg-card-hover);
+    border-color: var(--border-medium);
+    color: var(--text-primary);
+    transform: translateY(-1px);
+  }
+
+  .date-filter-btn.active {
+    background: linear-gradient(135deg, rgba(59, 130, 246, 0.15), rgba(99, 102, 241, 0.1));
+    border-color: var(--accent-secondary);
+    color: var(--accent-secondary);
+    box-shadow: 0 2px 8px rgba(59, 130, 246, 0.2);
+  }
+
+  .date-filter-btn svg {
+    opacity: 0.7;
+  }
+
+  .date-filter-btn.active svg {
+    opacity: 1;
   }
 
   .filters-bar {
@@ -1011,45 +737,89 @@ import AdminLayout from '../../../layouts/AdminLayout.astro';
     to { transform: rotate(360deg); }
   }
 
-  .empty-state svg {
-    margin-bottom: 16px;
-    color: var(--text-muted);
-  }
-
   .status-badge {
     display: inline-block;
-    padding: 4px 10px;
-    border-radius: var(--radius-sm);
+    padding: 6px 12px;
+    border-radius: 16px;
     font-size: 0.75rem;
-    font-weight: 600;
+    font-weight: 700;
     text-transform: uppercase;
+    letter-spacing: 0.05em;
+    border: 1.5px solid;
   }
 
-  .status-scraped { background: rgba(139, 92, 246, 0.15); color: #8b5cf6; }
-  .status-pending_review { background: rgba(245, 158, 11, 0.15); color: var(--warning); }
-  .status-ready_for_ai { background: rgba(59, 130, 246, 0.15); color: var(--accent-secondary); }
-  .status-processing_ai { background: rgba(14, 165, 233, 0.15); color: #0ea5e9; }
-  .status-ai_completed { background: rgba(34, 197, 94, 0.15); color: #22c55e; }
-  .status-ready_to_publish { background: rgba(16, 185, 129, 0.15); color: var(--success); }
-  .status-published { background: rgba(16, 185, 129, 0.15); color: var(--success); }
-  .status-discarded { background: rgba(107, 114, 128, 0.15); color: #6b7280; }
-  .status-error { background: rgba(239, 68, 68, 0.15); color: var(--error); }
-  .status-duplicate { background: rgba(107, 114, 128, 0.15); color: #6b7280; }
+  .status-scraped {
+    background: rgba(139, 92, 246, 0.12);
+    color: #8b5cf6;
+    border-color: rgba(139, 92, 246, 0.3);
+  }
+
+  .status-ready_for_ai {
+    background: rgba(59, 130, 246, 0.12);
+    color: var(--accent-secondary);
+    border-color: rgba(59, 130, 246, 0.3);
+  }
+
+  .status-ai_completed {
+    background: rgba(34, 197, 94, 0.12);
+    color: #22c55e;
+    border-color: rgba(34, 197, 94, 0.3);
+  }
+
+  .status-ready_to_publish {
+    background: rgba(16, 185, 129, 0.12);
+    color: var(--success);
+    border-color: rgba(16, 185, 129, 0.3);
+  }
+
+  .status-published {
+    background: rgba(16, 185, 129, 0.12);
+    color: var(--success);
+    border-color: rgba(16, 185, 129, 0.3);
+  }
+
+  .status-error {
+    background: rgba(239, 68, 68, 0.12);
+    color: var(--error);
+    border-color: rgba(239, 68, 68, 0.3);
+  }
 
   .media-badge {
     display: inline-block;
-    padding: 4px 8px;
+    padding: 6px 12px;
     background: var(--bg-secondary);
-    border-radius: var(--radius-sm);
+    border: 1.5px solid var(--border-subtle);
+    border-radius: 16px;
     font-size: 0.8rem;
-    font-weight: 500;
+    font-weight: 600;
     color: var(--text-secondary);
+  }
+
+  .category-badge {
+    display: inline-block;
+    padding: 6px 12px;
+    background: rgba(99, 102, 241, 0.12);
+    color: #6366f1;
+    border: 1.5px solid rgba(99, 102, 241, 0.3);
+    border-radius: 16px;
+    font-size: 0.8rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
   }
 
   .item-title {
     font-weight: 500;
     color: var(--text-primary);
     margin-bottom: 4px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .has-image-icon {
+    flex-shrink: 0;
+    color: #10b981;
+    opacity: 0.8;
   }
 
   .item-section {
@@ -1062,64 +832,7 @@ import AdminLayout from '../../../layouts/AdminLayout.astro';
     color: var(--text-secondary);
   }
 
-  .action-buttons {
-    display: flex;
-    gap: 8px;
-  }
-
-  .btn-icon {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 32px;
-    height: 32px;
-    padding: 0;
-    border: 1px solid var(--border-subtle);
-    background: transparent;
-    border-radius: var(--radius-sm);
-    color: var(--text-secondary);
-    cursor: pointer;
-    transition: all 0.2s ease;
-  }
-
-  .btn-icon:hover {
-    background: var(--bg-card-hover);
-    border-color: var(--border-medium);
-    color: var(--text-primary);
-  }
-
-  /* Success button - green */
-  .btn-icon.btn-success {
-    color: var(--success);
-    border-color: rgba(16, 185, 129, 0.3);
-  }
-
-  .btn-icon.btn-success:hover {
-    background: rgba(16, 185, 129, 0.1);
-    border-color: var(--success);
-  }
-
-  /* Warning button - orange */
-  .btn-icon.btn-warning {
-    color: var(--warning);
-    border-color: rgba(245, 158, 11, 0.3);
-  }
-
-  .btn-icon.btn-warning:hover {
-    background: rgba(245, 158, 11, 0.1);
-    border-color: var(--warning);
-  }
-
-  /* Danger button - red */
-  .btn-icon.btn-danger {
-    color: var(--error);
-    border-color: rgba(239, 68, 68, 0.3);
-  }
-
-  .btn-icon.btn-danger:hover {
-    background: rgba(239, 68, 68, 0.1);
-    border-color: var(--error);
-  }
+  /* Action button styles are defined globally in AdminLayout */
 
   .pagination {
     display: flex;
@@ -1143,39 +856,48 @@ import AdminLayout from '../../../layouts/AdminLayout.astro';
     left: 0;
     right: 0;
     bottom: 0;
-    background: rgba(0, 0, 0, 0.7);
+    background: rgba(0, 0, 0, 0.85) !important;
+    backdrop-filter: blur(4px) !important;
     display: flex;
     align-items: center;
     justify-content: center;
     z-index: 1000;
     padding: 20px;
+    animation: fadeIn 0.2s ease;
   }
 
   .modal-content {
     background: var(--bg-card);
-    border: 1px solid var(--border-subtle);
-    border-radius: var(--radius-lg);
-    max-width: 800px;
+    border: 1px solid var(--border-medium);
+    border-radius: 12px;
+    max-width: 1000px;
     width: 100%;
     max-height: 90vh;
     overflow: hidden;
     display: flex;
     flex-direction: column;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+  }
+
+  .modal-xlarge {
+    max-width: 1200px;
   }
 
   .modal-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 24px;
+    padding: 24px 32px;
     border-bottom: 1px solid var(--border-subtle);
+    background: linear-gradient(to bottom, var(--bg-card), var(--bg-secondary));
   }
 
   .modal-header h2 {
     margin: 0;
-    font-size: 1.25rem;
-    font-weight: 600;
+    font-size: 1.35rem;
+    font-weight: 700;
     color: var(--text-primary);
+    letter-spacing: -0.02em;
   }
 
   .modal-close {
@@ -1185,204 +907,433 @@ import AdminLayout from '../../../layouts/AdminLayout.astro';
     color: var(--text-muted);
     cursor: pointer;
     padding: 0;
-    width: 32px;
-    height: 32px;
+    width: 36px;
+    height: 36px;
     display: flex;
     align-items: center;
     justify-content: center;
-    border-radius: var(--radius-sm);
+    border-radius: var(--radius-md);
+    transition: all 0.2s ease;
   }
 
   .modal-close:hover {
-    background: var(--bg-secondary);
-    color: var(--text-primary);
+    background: rgba(239, 68, 68, 0.1);
+    color: #ef4444;
+    transform: scale(1.1);
   }
 
   .modal-body {
-    padding: 24px;
+    padding: 0;
     overflow-y: auto;
     flex: 1;
   }
 
+  .modal-body::-webkit-scrollbar {
+    width: 10px;
+  }
+
+  .modal-body::-webkit-scrollbar-track {
+    background: var(--bg-secondary);
+  }
+
+  .modal-body::-webkit-scrollbar-thumb {
+    background: var(--border-medium);
+    border-radius: 5px;
+  }
+
+  .modal-body::-webkit-scrollbar-thumb:hover {
+    background: var(--text-muted);
+  }
+
   .modal-footer {
-    padding: 20px 24px;
+    padding: 20px 32px;
     border-top: 1px solid var(--border-subtle);
     display: flex;
     justify-content: flex-end;
     gap: 12px;
-  }
-
-  .item-details {
-    display: flex;
-    flex-direction: column;
-    gap: 24px;
-  }
-
-  .detail-section {
-    padding: 20px;
     background: var(--bg-secondary);
-    border-radius: var(--radius-md);
   }
 
-  .detail-section h3 {
-    margin: 0 0 16px 0;
-    font-size: 1rem;
-    font-weight: 600;
-    color: var(--text-primary);
+  /* Preview Container */
+  .preview-container {
+    padding: 40px;
+    max-width: 900px;
+    margin: 0 auto;
   }
 
-  .detail-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-    gap: 12px;
-    font-size: 0.9rem;
+  .preview-header {
+    margin-bottom: 32px;
+    padding-bottom: 20px;
+    border-bottom: 2px solid var(--border-subtle);
   }
 
-  .detail-grid div {
-    color: var(--text-secondary);
-  }
-
-  .detail-grid strong {
-    color: var(--text-primary);
-    font-weight: 500;
-  }
-
-  .detail-field {
-    margin-bottom: 16px;
-  }
-
-  .detail-field:last-child {
-    margin-bottom: 0;
-  }
-
-  .detail-field strong {
-    display: block;
-    margin-bottom: 8px;
-    font-size: 0.85rem;
-    font-weight: 600;
-    color: var(--text-primary);
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-  }
-
-  .detail-field p {
-    margin: 0;
-    color: var(--text-secondary);
-    line-height: 1.6;
-  }
-
-  .detail-field a {
-    color: var(--accent-secondary);
-    text-decoration: none;
-    word-break: break-all;
-  }
-
-  .detail-field a:hover {
-    text-decoration: underline;
-  }
-
-  .content-preview {
-    padding: 12px;
-    background: var(--bg-primary);
-    border-radius: var(--radius-sm);
-    font-size: 0.9rem;
-    line-height: 1.6;
-    color: var(--text-secondary);
-    white-space: pre-wrap;
-  }
-
-  .tags-list {
+  .preview-meta {
     display: flex;
+    gap: 10px;
+    margin-bottom: 16px;
     flex-wrap: wrap;
-    gap: 8px;
+  }
+
+  .preview-info {
+    display: flex;
+    gap: 24px;
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+    flex-wrap: wrap;
+  }
+
+  .preview-info > div {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .preview-article {
+    margin-top: 40px;
+  }
+
+  .preview-title {
+    font-size: 2.25rem;
+    font-weight: 800;
+    line-height: 1.2;
+    color: var(--text-primary);
+    margin: 0 0 24px 0;
+    letter-spacing: -0.03em;
+  }
+
+  .preview-summary {
+    font-size: 1.15rem;
+    line-height: 1.7;
+    color: var(--text-secondary);
+    margin-bottom: 24px;
+    padding: 20px 24px;
+    background: linear-gradient(135deg, rgba(59, 130, 246, 0.05), rgba(99, 102, 241, 0.05));
+    border-left: 4px solid var(--accent-secondary);
+    border-radius: 8px;
+    font-style: italic;
+  }
+
+  .preview-tags {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 28px;
+    flex-wrap: wrap;
   }
 
   .tag {
-    display: inline-block;
-    padding: 4px 10px;
-    background: var(--bg-primary);
-    border-radius: var(--radius-sm);
-    font-size: 0.8rem;
+    padding: 8px 14px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-subtle);
+    border-radius: 20px;
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    font-weight: 600;
+    transition: all 0.2s ease;
+  }
+
+  .tag:hover {
+    background: var(--bg-card);
+    border-color: var(--accent-secondary);
+    color: var(--accent-secondary);
+    transform: translateY(-2px);
+  }
+
+  /* Reading Levels Tabs */
+  .reading-levels {
+    margin: 40px 0;
+    border: 2px solid var(--border-subtle);
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  }
+
+  .tabs-header {
+    display: flex;
+    background: linear-gradient(to bottom, var(--bg-secondary), var(--bg-card));
+    border-bottom: 2px solid var(--border-medium);
+    position: relative;
+  }
+
+  .tab-btn {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 18px 24px;
+    background: transparent;
+    border: none;
+    border-right: 1px solid var(--border-subtle);
+    color: var(--text-muted);
+    font-size: 0.95rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+  }
+
+  .tab-btn:last-child {
+    border-right: none;
+  }
+
+  .tab-btn svg {
+    transition: transform 0.25s ease;
+  }
+
+  .tab-btn:hover {
+    background: linear-gradient(to bottom, rgba(59, 130, 246, 0.08), rgba(59, 130, 246, 0.04));
     color: var(--text-secondary);
   }
 
-  .error-section {
-    background: rgba(239, 68, 68, 0.05);
-    border: 1px solid rgba(239, 68, 68, 0.2);
+  .tab-btn:hover svg {
+    transform: translateY(-2px);
   }
 
-  .error-message {
-    margin: 0;
-    padding: 12px;
-    background: var(--bg-primary);
-    border-radius: var(--radius-sm);
-    font-size: 0.85rem;
-    line-height: 1.6;
-    color: var(--error);
-    overflow-x: auto;
-  }
-
-  /* Publish button - indigo */
-  .btn-icon.btn-publish {
-    color: #6366f1;
-    border-color: rgba(99, 102, 241, 0.3);
-  }
-
-  .btn-icon.btn-publish:hover {
-    background: rgba(99, 102, 241, 0.1);
-    border-color: #6366f1;
-  }
-
-  /* Alert info */
-  .alert-info {
-    display: flex;
-    align-items: flex-start;
-    gap: 12px;
-    padding: 12px 16px;
-    background: rgba(59, 130, 246, 0.1);
-    border: 1px solid rgba(59, 130, 246, 0.3);
-    border-radius: var(--radius-sm);
+  .tab-btn.active {
+    background: var(--bg-card);
     color: var(--accent-secondary);
-    font-size: 0.9rem;
-    line-height: 1.5;
-    margin-bottom: 16px;
+    font-weight: 700;
+    position: relative;
   }
 
-  .alert-info svg {
-    flex-shrink: 0;
-    margin-top: 2px;
+  .tab-btn.active::after {
+    content: '';
+    position: absolute;
+    bottom: -2px;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: var(--accent-secondary);
+    border-radius: 3px 3px 0 0;
   }
 
-  .alert-info p {
+  .tab-btn.active svg {
+    transform: scale(1.1);
+  }
+
+  .tabs-content {
+    background: var(--bg-card);
+  }
+
+  .tab-panel {
+    display: none;
+    padding: 36px;
+    animation: fadeIn 0.35s ease;
+    min-height: 200px;
+  }
+
+  .tab-panel.active {
+    display: block;
+  }
+
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+      transform: translateY(12px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .level-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 16px;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-bottom: 20px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    transition: all 0.2s ease;
+  }
+
+  .level-badge:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+  }
+
+  .level-badge.sin-vueltas {
+    background: linear-gradient(135deg, rgba(239, 68, 68, 0.2), rgba(239, 68, 68, 0.1));
+    color: #dc2626;
+    border: 2px solid rgba(239, 68, 68, 0.3);
+  }
+
+  .level-badge.lo-central {
+    background: linear-gradient(135deg, rgba(245, 158, 11, 0.2), rgba(245, 158, 11, 0.1));
+    color: #d97706;
+    border: 2px solid rgba(245, 158, 11, 0.3);
+  }
+
+  .level-badge.en-profundidad {
+    background: linear-gradient(135deg, rgba(34, 197, 94, 0.2), rgba(34, 197, 94, 0.1));
+    color: #16a34a;
+    border: 2px solid rgba(34, 197, 94, 0.3);
+  }
+
+  .reading-content {
+    font-size: 1.1rem;
+    line-height: 1.9;
+    color: var(--text-primary);
     margin: 0;
+    white-space: pre-wrap;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+    letter-spacing: -0.01em;
   }
 
-  /* Modal large variant */
-  .modal-large {
-    max-width: 900px;
+  .reading-content p {
+    margin-bottom: 1.5em;
+  }
+
+  .preview-source {
+    margin-top: 40px;
+    padding-top: 24px;
+    border-top: 2px solid var(--border-subtle);
+    font-size: 0.9rem;
+    color: var(--text-muted);
+  }
+
+  .preview-source a {
+    color: var(--accent-secondary);
+    text-decoration: none;
+    word-break: break-all;
+    font-weight: 500;
+    transition: all 0.2s ease;
+  }
+
+  .preview-source a:hover {
+    text-decoration: underline;
+    color: #2563eb;
+  }
+
+  .preview-ai-info {
+    display: flex;
+    gap: 20px;
+    margin-top: 16px;
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    font-style: italic;
+  }
+
+  /* Enhanced Modal Buttons */
+  .modal-btn {
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+    padding: 12px 24px !important;
+    font-size: 0.95rem !important;
+    font-weight: 600 !important;
+    border-radius: 8px !important;
+    cursor: pointer !important;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+    border: none !important;
+    outline: none !important;
+    letter-spacing: 0.01em !important;
+  }
+
+  .modal-btn:active {
+    transform: scale(0.98) !important;
+  }
+
+  .modal-btn-success {
+    background: linear-gradient(135deg, #10b981, #059669) !important;
+    color: white !important;
+    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3) !important;
+  }
+
+  .modal-btn-success:hover {
+    background: linear-gradient(135deg, #059669, #047857) !important;
+    box-shadow: 0 6px 16px rgba(16, 185, 129, 0.4) !important;
+    transform: translateY(-2px) !important;
+  }
+
+  .modal-btn-secondary {
+    background: var(--bg-secondary) !important;
+    color: var(--text-secondary) !important;
+    border: 2px solid var(--border-medium) !important;
+  }
+
+  .modal-btn-secondary:hover {
+    background: var(--bg-card-hover) !important;
+    border-color: var(--text-muted) !important;
+    color: var(--text-primary) !important;
   }
 
   @media (max-width: 768px) {
-    .filters-bar {
-      flex-direction: column;
-      align-items: stretch;
-    }
-
-    .filter-group {
-      min-width: 100%;
-    }
-
     .stats-grid {
       grid-template-columns: 1fr;
     }
 
-    .table {
-      font-size: 0.85rem;
+    .modal {
+      padding: 10px;
     }
 
     .modal-content {
-      max-height: 100vh;
-      border-radius: 0;
+      max-height: 95vh;
+    }
+
+    .modal-header {
+      padding: 20px 24px;
+    }
+
+    .modal-header h2 {
+      font-size: 1.15rem;
+    }
+
+    .modal-footer {
+      padding: 16px 24px;
+      flex-wrap: wrap;
+    }
+
+    .preview-container {
+      padding: 24px 20px;
+    }
+
+    .preview-title {
+      font-size: 1.65rem;
+    }
+
+    .preview-summary {
+      font-size: 1rem;
+      padding: 16px;
+    }
+
+    .tabs-header {
+      flex-direction: column;
+    }
+
+    .tab-btn {
+      border-right: none;
+      border-bottom: 1px solid var(--border-subtle);
+      padding: 14px 16px;
+    }
+
+    .tab-btn:last-child {
+      border-bottom: none;
+    }
+
+    .tab-btn.active::after {
+      bottom: auto;
+      top: -2px;
+      height: 3px;
+    }
+
+    .tab-panel {
+      padding: 24px 16px;
+    }
+
+    .reading-content {
+      font-size: 1rem;
+      line-height: 1.75;
+    }
+
+    .modal-btn {
+      width: 100% !important;
+      justify-content: center !important;
     }
   }
 </style>

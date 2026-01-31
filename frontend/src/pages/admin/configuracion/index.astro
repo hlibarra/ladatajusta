@@ -1,0 +1,542 @@
+---
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+---
+
+<AdminLayout title="Configuración - Admin">
+  <div class="page-header">
+    <h1 class="page-title">Configuración del Sitio</h1>
+    <p class="page-subtitle">Ajusta la visualización y comportamiento del sitio</p>
+  </div>
+
+  <div class="config-sections">
+    <!-- Display Settings -->
+    <section class="config-section">
+      <div class="section-header">
+        <div class="section-icon display">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="24" height="24">
+            <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+            <line x1="8" y1="21" x2="16" y2="21"></line>
+            <line x1="12" y1="17" x2="12" y2="21"></line>
+          </svg>
+        </div>
+        <div class="section-info">
+          <h2 class="section-title">Visualización</h2>
+          <p class="section-description">Controla cómo se muestran las noticias en el sitio</p>
+        </div>
+      </div>
+
+      <div class="config-options">
+        <div class="config-option">
+          <div class="option-info">
+            <span class="option-label">Mostrar imágenes</span>
+            <span class="option-description">Muestra las imágenes en las tarjetas de noticias y páginas de detalle</span>
+          </div>
+          <label class="toggle">
+            <input type="checkbox" id="show_images" />
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+
+        <div class="config-option">
+          <div class="option-info">
+            <span class="option-label">Mostrar autor</span>
+            <span class="option-description">Muestra el agente que escribió cada noticia</span>
+          </div>
+          <label class="toggle">
+            <input type="checkbox" id="show_author" />
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+
+        <div class="config-option">
+          <div class="option-info">
+            <span class="option-label">Tiempo de lectura</span>
+            <span class="option-description">Muestra el tiempo estimado de lectura</span>
+          </div>
+          <label class="toggle">
+            <input type="checkbox" id="show_reading_time" />
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+
+        <div class="config-option">
+          <div class="option-info">
+            <span class="option-label">Mostrar fuente</span>
+            <span class="option-description">Muestra el medio de origen de cada noticia</span>
+          </div>
+          <label class="toggle">
+            <input type="checkbox" id="show_source_media" />
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+
+        <div class="config-option">
+          <div class="option-info">
+            <span class="option-label">Estilo de tarjetas</span>
+            <span class="option-description">Define el estilo visual de las tarjetas de noticias</span>
+          </div>
+          <select id="card_style" class="select-input">
+            <option value="default">Predeterminado</option>
+            <option value="compact">Compacto</option>
+            <option value="editorial">Editorial</option>
+          </select>
+        </div>
+      </div>
+    </section>
+
+    <!-- Features Settings -->
+    <section class="config-section">
+      <div class="section-header">
+        <div class="section-icon features">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="24" height="24">
+            <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+          </svg>
+        </div>
+        <div class="section-info">
+          <h2 class="section-title">Funcionalidades</h2>
+          <p class="section-description">Activa o desactiva características del sitio</p>
+        </div>
+      </div>
+
+      <div class="config-options">
+        <div class="config-option">
+          <div class="option-info">
+            <span class="option-label">Sistema de votos</span>
+            <span class="option-description">Permite a los usuarios votar las noticias</span>
+          </div>
+          <label class="toggle">
+            <input type="checkbox" id="voting_enabled" />
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+
+        <div class="config-option">
+          <div class="option-info">
+            <span class="option-label">Compartir en redes</span>
+            <span class="option-description">Muestra botones para compartir en redes sociales</span>
+          </div>
+          <label class="toggle">
+            <input type="checkbox" id="social_sharing" />
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+
+        <div class="config-option">
+          <div class="option-info">
+            <span class="option-label">Noticias relacionadas</span>
+            <span class="option-description">Muestra noticias relacionadas al final de cada artículo</span>
+          </div>
+          <label class="toggle">
+            <input type="checkbox" id="related_news" />
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <div class="save-bar">
+    <span class="save-status" id="save-status"></span>
+    <button class="btn-save" id="btn-save">Guardar cambios</button>
+  </div>
+</AdminLayout>
+
+<script>
+  import { authFetch } from '../../../lib/auth';
+
+  interface DisplayConfig {
+    show_images: boolean;
+    card_style: string;
+    show_author: boolean;
+    show_reading_time: boolean;
+    show_source_media: boolean;
+  }
+
+  interface FeaturesConfig {
+    voting_enabled: boolean;
+    social_sharing: boolean;
+    related_news: boolean;
+  }
+
+  let displayConfig: DisplayConfig = {
+    show_images: true,
+    card_style: 'default',
+    show_author: true,
+    show_reading_time: true,
+    show_source_media: true
+  };
+
+  let featuresConfig: FeaturesConfig = {
+    voting_enabled: true,
+    social_sharing: false,
+    related_news: true
+  };
+
+  const saveStatus = document.getElementById('save-status')!;
+  const saveBtn = document.getElementById('btn-save')!;
+
+  async function loadConfig() {
+    try {
+      // Load display config
+      const displayRes = await authFetch('/api/config/display');
+      if (displayRes.ok) {
+        displayConfig = await displayRes.json();
+      }
+
+      // Load features config
+      const featuresRes = await authFetch('/api/config/features');
+      if (featuresRes.ok) {
+        featuresConfig = await featuresRes.json();
+      }
+
+      // Update UI
+      updateUI();
+    } catch (e) {
+      console.error('Error loading config:', e);
+      showStatus('Error al cargar configuración', 'error');
+    }
+  }
+
+  function updateUI() {
+    // Display settings
+    (document.getElementById('show_images') as HTMLInputElement).checked = displayConfig.show_images;
+    (document.getElementById('show_author') as HTMLInputElement).checked = displayConfig.show_author;
+    (document.getElementById('show_reading_time') as HTMLInputElement).checked = displayConfig.show_reading_time;
+    (document.getElementById('show_source_media') as HTMLInputElement).checked = displayConfig.show_source_media;
+    (document.getElementById('card_style') as HTMLSelectElement).value = displayConfig.card_style;
+
+    // Features settings
+    (document.getElementById('voting_enabled') as HTMLInputElement).checked = featuresConfig.voting_enabled;
+    (document.getElementById('social_sharing') as HTMLInputElement).checked = featuresConfig.social_sharing;
+    (document.getElementById('related_news') as HTMLInputElement).checked = featuresConfig.related_news;
+  }
+
+  function collectConfig() {
+    displayConfig = {
+      show_images: (document.getElementById('show_images') as HTMLInputElement).checked,
+      card_style: (document.getElementById('card_style') as HTMLSelectElement).value,
+      show_author: (document.getElementById('show_author') as HTMLInputElement).checked,
+      show_reading_time: (document.getElementById('show_reading_time') as HTMLInputElement).checked,
+      show_source_media: (document.getElementById('show_source_media') as HTMLInputElement).checked
+    };
+
+    featuresConfig = {
+      voting_enabled: (document.getElementById('voting_enabled') as HTMLInputElement).checked,
+      social_sharing: (document.getElementById('social_sharing') as HTMLInputElement).checked,
+      related_news: (document.getElementById('related_news') as HTMLInputElement).checked
+    };
+  }
+
+  async function saveConfig() {
+    collectConfig();
+    saveBtn.setAttribute('disabled', 'true');
+    saveBtn.textContent = 'Guardando...';
+
+    try {
+      // Build updates object for bulk update
+      const updates: Record<string, any> = {
+        'display.show_images': displayConfig.show_images,
+        'display.card_style': displayConfig.card_style,
+        'display.show_author': displayConfig.show_author,
+        'display.show_reading_time': displayConfig.show_reading_time,
+        'display.show_source_media': displayConfig.show_source_media,
+        'features.voting_enabled': featuresConfig.voting_enabled,
+        'features.social_sharing': featuresConfig.social_sharing,
+        'features.related_news': featuresConfig.related_news
+      };
+
+      const res = await authFetch('/api/config/bulk-update', {
+        method: 'POST',
+        body: JSON.stringify(updates)
+      });
+
+      if (!res.ok) {
+        throw new Error('Failed to save configuration');
+      }
+
+      showStatus('Configuración guardada', 'success');
+    } catch (e) {
+      console.error('Error saving config:', e);
+      showStatus('Error al guardar', 'error');
+    } finally {
+      saveBtn.removeAttribute('disabled');
+      saveBtn.textContent = 'Guardar cambios';
+    }
+  }
+
+  function showStatus(message: string, type: 'success' | 'error') {
+    saveStatus.textContent = message;
+    saveStatus.className = `save-status ${type}`;
+    setTimeout(() => {
+      saveStatus.textContent = '';
+      saveStatus.className = 'save-status';
+    }, 3000);
+  }
+
+  // Event listeners
+  saveBtn.addEventListener('click', saveConfig);
+
+  // Load config on page load
+  document.addEventListener('DOMContentLoaded', loadConfig);
+</script>
+
+<style>
+  .config-sections {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+    margin-bottom: 80px;
+  }
+
+  .config-section {
+    background: var(--bg-card);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+  }
+
+  .section-header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 24px;
+    border-bottom: 1px solid var(--border-subtle);
+    background: var(--bg-secondary);
+  }
+
+  .section-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: var(--radius-md);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  .section-icon.display {
+    background: rgba(59, 130, 246, 0.15);
+    color: var(--accent-secondary);
+  }
+
+  .section-icon.features {
+    background: rgba(245, 158, 11, 0.15);
+    color: #f59e0b;
+  }
+
+  .section-info {
+    flex: 1;
+  }
+
+  .section-title {
+    margin: 0 0 4px;
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--text-primary);
+  }
+
+  .section-description {
+    margin: 0;
+    font-size: 0.9rem;
+    color: var(--text-muted);
+  }
+
+  .config-options {
+    padding: 8px 0;
+  }
+
+  .config-option {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 24px;
+    border-bottom: 1px solid var(--border-subtle);
+  }
+
+  .config-option:last-child {
+    border-bottom: none;
+  }
+
+  .option-info {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .option-label {
+    font-size: 0.95rem;
+    font-weight: 500;
+    color: var(--text-primary);
+  }
+
+  .option-description {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+  }
+
+  /* Toggle Switch */
+  .toggle {
+    position: relative;
+    display: inline-block;
+    width: 52px;
+    height: 28px;
+    flex-shrink: 0;
+  }
+
+  .toggle input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+  }
+
+  .toggle-slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: var(--bg-secondary);
+    border: 1px solid var(--border-subtle);
+    transition: 0.3s;
+    border-radius: 28px;
+  }
+
+  .toggle-slider::before {
+    position: absolute;
+    content: "";
+    height: 20px;
+    width: 20px;
+    left: 3px;
+    bottom: 3px;
+    background-color: var(--text-muted);
+    transition: 0.3s;
+    border-radius: 50%;
+  }
+
+  .toggle input:checked + .toggle-slider {
+    background-color: var(--accent-secondary);
+    border-color: var(--accent-secondary);
+  }
+
+  .toggle input:checked + .toggle-slider::before {
+    transform: translateX(24px);
+    background-color: white;
+  }
+
+  .toggle input:focus + .toggle-slider {
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3);
+  }
+
+  /* Select Input */
+  .select-input {
+    padding: 8px 12px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    color: var(--text-primary);
+    font-size: 0.9rem;
+    cursor: pointer;
+    min-width: 150px;
+  }
+
+  .select-input:focus {
+    outline: none;
+    border-color: var(--accent-secondary);
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+  }
+
+  /* Save Bar */
+  .save-bar {
+    position: fixed;
+    bottom: 0;
+    left: 280px;
+    right: 0;
+    padding: 16px 32px;
+    background: var(--bg-card);
+    border-top: 1px solid var(--border-subtle);
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 16px;
+    z-index: 100;
+  }
+
+  .save-status {
+    font-size: 0.9rem;
+    font-weight: 500;
+  }
+
+  .save-status.success {
+    color: var(--success);
+  }
+
+  .save-status.error {
+    color: var(--error);
+  }
+
+  .btn-save {
+    padding: 10px 24px;
+    background: var(--accent-secondary);
+    color: white;
+    border: none;
+    border-radius: var(--radius-md);
+    font-size: 0.95rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .btn-save:hover:not(:disabled) {
+    background: var(--accent-primary);
+  }
+
+  .btn-save:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+
+  @media (max-width: 768px) {
+    .section-header {
+      padding: 16px;
+      gap: 12px;
+    }
+
+    .section-icon {
+      width: 40px;
+      height: 40px;
+    }
+
+    .section-title {
+      font-size: 1rem;
+    }
+
+    .section-description {
+      font-size: 0.8rem;
+    }
+
+    .config-option {
+      padding: 12px 16px;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 12px;
+    }
+
+    .option-info {
+      width: 100%;
+    }
+
+    .toggle {
+      align-self: flex-end;
+    }
+
+    .select-input {
+      width: 100%;
+    }
+
+    .save-bar {
+      left: 0;
+      padding: 12px 16px;
+    }
+  }
+</style>

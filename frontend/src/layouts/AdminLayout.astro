@@ -55,6 +55,12 @@ const { title = 'Admin - La Data Justa' } = Astro.props;
             </svg>
             Scraping
           </a>
+          <a href="/admin/fuentes" class="nav-item">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
+              <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/>
+            </svg>
+            Fuentes
+          </a>
           <a href="/admin/noticias" class="nav-item">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
               <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
@@ -65,6 +71,14 @@ const { title = 'Admin - La Data Justa' } = Astro.props;
             </svg>
             Noticias
           </a>
+          <a href="/admin/secciones" class="nav-item">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
+              <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+              <line x1="9" y1="22" x2="9" y2="12"></line>
+              <line x1="15" y1="22" x2="15" y2="12"></line>
+            </svg>
+            Secciones
+          </a>
           <a href="/admin/feeds" class="nav-item">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
               <path d="M4 11a9 9 0 0 1 9 9"></path>
@@ -72,6 +86,13 @@ const { title = 'Admin - La Data Justa' } = Astro.props;
               <circle cx="5" cy="19" r="1"></circle>
             </svg>
             Feeds RSS
+          </a>
+          <a href="/admin/configuracion" class="nav-item">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
+              <circle cx="12" cy="12" r="3"></circle>
+              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+            </svg>
+            Configuracion
           </a>
         </nav>
         <div class="sidebar-footer">
@@ -599,6 +620,103 @@ const { title = 'Admin - La Data Justa' } = Astro.props;
         .table-wrapper {
           overflow-x: auto;
           -webkit-overflow-scrolling: touch;
+        }
+      }
+
+      /* Action buttons for tables - global styles for dynamic content */
+      .action-buttons {
+        display: flex;
+        gap: 8px;
+      }
+
+      .action-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 8px 14px;
+        border: none;
+        border-radius: 8px;
+        font-size: 0.82rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        white-space: nowrap;
+        text-decoration: none;
+      }
+
+      .action-btn svg {
+        flex-shrink: 0;
+        width: 15px;
+        height: 15px;
+      }
+
+      .action-btn-view {
+        background: #3b82f6;
+        color: white;
+        box-shadow: 0 2px 4px rgba(59, 130, 246, 0.3);
+      }
+
+      .action-btn-view:hover {
+        background: #2563eb;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+      }
+
+      .action-btn-publish {
+        background: linear-gradient(135deg, #10b981, #059669);
+        color: white;
+        box-shadow: 0 2px 4px rgba(16, 185, 129, 0.3);
+      }
+
+      .action-btn-publish:hover {
+        background: linear-gradient(135deg, #059669, #047857);
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
+      }
+
+      .action-btn-edit {
+        background: #6366f1;
+        color: white;
+        box-shadow: 0 2px 4px rgba(99, 102, 241, 0.3);
+      }
+
+      .action-btn-edit:hover {
+        background: #4f46e5;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);
+      }
+
+      .action-btn-delete {
+        background: #ef4444;
+        color: white;
+        box-shadow: 0 2px 4px rgba(239, 68, 68, 0.3);
+      }
+
+      .action-btn-delete:hover {
+        background: #dc2626;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(239, 68, 68, 0.4);
+      }
+
+      .action-btn-ai {
+        background: linear-gradient(135deg, #8b5cf6, #6366f1);
+        color: white;
+        box-shadow: 0 2px 4px rgba(139, 92, 246, 0.3);
+      }
+
+      .action-btn-ai:hover {
+        background: linear-gradient(135deg, #7c3aed, #4f46e5);
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(139, 92, 246, 0.4);
+      }
+
+      @media (max-width: 900px) {
+        .action-btn span {
+          display: none;
+        }
+
+        .action-btn {
+          padding: 10px;
         }
       }
     </style>

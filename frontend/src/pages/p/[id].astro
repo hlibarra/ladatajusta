@@ -34,13 +34,43 @@ type Publication = {
 	content_lo_central?: string | null;
 	content_en_profundidad?: string | null;
 	media?: MediaItem[];
+	pulso_informativo?: number | null;
+	origin_type?: string | null;
 };
+
+interface DisplayConfig {
+	show_images: boolean;
+	card_style: string;
+	show_author: boolean;
+	show_reading_time: boolean;
+	show_source_media: boolean;
+}
 
 const { id } = Astro.params;
 const API_BASE = import.meta.env.PUBLIC_API_BASE_URL ?? 'http://localhost:8000';
 
 let pub: Publication | null = null;
 let error = false;
+
+// Fetch display configuration
+let displayConfig: DisplayConfig = {
+	show_images: true,
+	card_style: 'default',
+	show_author: true,
+	show_reading_time: true,
+	show_source_media: true
+};
+
+try {
+	const configRes = await fetch(`${API_BASE}/api/config/display`);
+	if (configRes.ok) {
+		displayConfig = await configRes.json();
+	}
+} catch (e) {
+	// Use defaults if config fetch fails
+}
+
+const showImages = displayConfig.show_images;
 
 try {
 	const res = await fetch(`${API_BASE}/api/publications/${id}`);
@@ -52,65 +82,91 @@ try {
 } catch (e) {
 	error = true;
 }
+
+// Helper para tiempo relativo
+function getTimeAgo(dateString: string): string {
+	const date = new Date(dateString);
+	const now = new Date();
+	const diffMs = now.getTime() - date.getTime();
+	const diffMins = Math.floor(diffMs / 60000);
+	const diffHours = Math.floor(diffMins / 60);
+	const diffDays = Math.floor(diffHours / 24);
+
+	if (diffMins < 60) return `hace ${diffMins} min`;
+	if (diffHours < 24) return `hace ${diffHours}h`;
+	if (diffDays === 1) return 'ayer';
+	if (diffDays < 7) return `hace ${diffDays} días`;
+	return date.toLocaleDateString('es-AR', { day: 'numeric', month: 'long', year: 'numeric' });
+}
+
+// Mapeo de pulso informativo a estado editorial
+function getEditorialState(pulso: number | null | undefined): string | null {
+	if (!pulso) return null;
+	const states: Record<number, string> = {
+		1: 'estabilidad',
+		2: 'incertidumbre',
+		3: 'tensión',
+		4: 'impacto',
+		5: 'cierre'
+	};
+	return states[pulso] || null;
+}
+
+// Mapeo de origin_type a texto legible
+function getOriginLabel(originType: string | null | undefined): string | null {
+	if (!originType) return null;
+	const labels: Record<string, string> = {
+		'detected_media': 'Detectado en medios',
+		'editorial_ia': 'Editorial IA'
+	};
+	return labels[originType] || null;
+}
 ---
 
 <Layout title={pub?.title ?? 'Noticia'}>
-	<nav class="breadcrumb">
-		<a href="/">Inicio</a>
-		<span class="sep">/</span>
-		<span>Noticia</span>
-	</nav>
-
 	{error || !pub ? (
-		<div class="error-card">
+		<div class="error-state">
 			<p>No se pudo cargar la noticia.</p>
-			<a href="/" class="back-btn">Volver al inicio</a>
+			<a href="/" class="back-link">Volver al inicio</a>
 		</div>
 	) : (
 		<article class="article">
 			<header class="article-header">
-				{pub.category && <span class="category">{pub.category}</span>}
-				<time class="date">{new Date(pub.created_at).toLocaleDateString('es-AR', { day: 'numeric', month: 'long', year: 'numeric' })}</time>
+				<div class="article-meta">
+					{pub.category && (
+						<span class="category">{pub.category}</span>
+					)}
+					{getEditorialState(pub.pulso_informativo) && (
+						<span class="editorial-state">{getEditorialState(pub.pulso_informativo)}</span>
+					)}
+					<time class="time">{getTimeAgo(pub.published_at || pub.created_at)}</time>
+				</div>
+				<h1 class="title">{pub.title}</h1>
+				{pub.agent && (
+					<div class="byline">
+						Por <span class="agent-name">{pub.agent.name}</span>
+						{pub.agent.specialization && (
+							<span class="agent-spec"> · {pub.agent.specialization}</span>
+						)}
+					</div>
+				)}
+				{getOriginLabel(pub.origin_type) && (
+					<div class="origin-badge">
+						<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+							<path d="M12 2L2 7l10 5 10-5-10-5z"/>
+							<path d="M2 17l10 5 10-5"/>
+							<path d="M2 12l10 5 10-5"/>
+						</svg>
+						{getOriginLabel(pub.origin_type)}
+					</div>
+				)}
 			</header>
 
-			<h1 class="title">{pub.title}</h1>
-
-			{pub.agent && (
-				<div class="agent-byline">
-					<div class="agent-avatar">
-						{pub.agent.avatar_url ? (
-							<img src={pub.agent.avatar_url} alt={pub.agent.name} />
-						) : (
-							<div class="agent-avatar-placeholder">
-								{pub.agent.name.charAt(0)}
-							</div>
-						)}
-					</div>
-					<div class="agent-info">
-						<div class="agent-label">Escrito por</div>
-						<div class="agent-name">{pub.agent.name}</div>
-						{pub.agent.specialization && (
-							<div class="agent-specialization">{pub.agent.specialization}</div>
-						)}
-					</div>
-				</div>
-			)}
-
-			<p class="summary">{pub.summary}</p>
-
-			{pub.tags?.length > 0 && (
-				<div class="tags">
-					{pub.tags.slice(0, 10).map((t) => (
-						<span class="tag">{t}</span>
-					))}
-				</div>
-			)}
-
-			{/* Media Gallery */}
-			{pub.media && pub.media.length > 0 && (
+			{/* Media Gallery - Only show if images are enabled */}
+			{showImages && pub.media && pub.media.length > 0 && (
 				<div class="media-gallery">
 					{pub.media.sort((a, b) => a.order - b.order).map((item) => (
-						<div class="media-item">
+						<figure class="media-item">
 							{item.type === 'image' ? (
 								<img src={item.url} alt={item.caption || pub.title} loading="lazy" />
 							) : (
@@ -124,144 +180,99 @@ try {
 									></iframe>
 								</div>
 							)}
-							{item.caption && <div class="media-caption">{item.caption}</div>}
-						</div>
+							{item.caption && <figcaption>{item.caption}</figcaption>}
+						</figure>
 					))}
 				</div>
 			)}
 
-			{/* Reading Level Selector */}
-			{(pub.content_sin_vueltas || pub.content_lo_central || pub.content_en_profundidad) && (
-				<div class="reading-level-selector">
-					<div class="level-label">Nivel de lectura:</div>
-					<div class="level-buttons">
-						{pub.content_sin_vueltas && (
-							<button class="level-btn" data-level="sin_vueltas">
-								<span class="level-name">Sin vueltas</span>
-								<span class="level-desc">Directo</span>
-							</button>
-						)}
-						{pub.content_lo_central && (
-							<button class="level-btn active" data-level="lo_central">
-								<span class="level-name">Lo central</span>
-								<span class="level-desc">Esencial</span>
-							</button>
-						)}
-						{pub.content_en_profundidad && (
-							<button class="level-btn" data-level="en_profundidad">
-								<span class="level-name">En profundidad</span>
-								<span class="level-desc">Completo</span>
-							</button>
-						)}
+			{/* Esto es lo importante - Destacado */}
+			{pub.content_sin_vueltas && (
+				<section class="highlight-box">
+					<div class="highlight-header">
+						<svg class="highlight-icon" viewBox="0 0 24 24" fill="currentColor" width="20" height="20">
+							<circle cx="12" cy="12" r="10" fill="currentColor" opacity="0.15"/>
+							<circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2" fill="none"/>
+							<path d="M12 16v-4M12 8h.01" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+						</svg>
+						<span class="highlight-label">Esto es lo importante</span>
 					</div>
+					<div class="highlight-content">
+						{pub.content_sin_vueltas.split('\n').map((paragraph) => (
+							paragraph.trim() && <p>{paragraph}</p>
+						))}
+					</div>
+				</section>
+			)}
+
+			{/* Lo central */}
+			{pub.content_lo_central && (
+				<section class="content-section">
+					<h2 class="section-label">Lo central</h2>
+					<div class="content-body">
+						{pub.content_lo_central.split('\n').map((paragraph) => (
+							paragraph.trim() && <p>{paragraph}</p>
+						))}
+					</div>
+				</section>
+			)}
+
+			{/* AdSense: Rectangle Ad (300x250) */}
+			{pub.content_lo_central && (
+				<div class="ad-rectangle">
+					<ins class="adsbygoogle"
+						style="display:block"
+						data-ad-client="ca-pub-XXXXXXXXXX"
+						data-ad-slot="XXXXXXXXXX"
+						data-ad-format="rectangle"
+						data-full-width-responsive="true"></ins>
+					<script is:inline>(adsbygoogle = window.adsbygoogle || []).push({});</script>
 				</div>
 			)}
 
-			{/* Hidden JSON data for reading levels */}
-			<script type="application/json" id="reading-levels-data" set:html={JSON.stringify({
-				sin_vueltas: pub.content_sin_vueltas || '',
-				lo_central: pub.content_lo_central || pub.summary,
-				en_profundidad: pub.content_en_profundidad || pub.body
-			})} />
+			{/* En profundidad */}
+			{pub.content_en_profundidad && (
+				<section class="content-section depth">
+					<h2 class="section-label">En profundidad</h2>
+					<div class="content-body">
+						{pub.content_en_profundidad.split('\n').map((paragraph) => (
+							paragraph.trim() && <p>{paragraph}</p>
+						))}
+					</div>
+				</section>
+			)}
 
-			<div class="body-content" id="article-content">
-				{pub.body.split('\n').map((paragraph) => (
-					paragraph.trim() && <p>{paragraph}</p>
-				))}
-			</div>
+			{pub.tags?.length > 0 && (
+				<div class="tags">
+					{pub.tags.slice(0, 8).map((t) => (
+						<span class="tag">{t}</span>
+					))}
+				</div>
+			)}
 
 			<footer class="article-footer">
 				<div class="votes" data-id={pub.id}>
-					<span class="votes-label">Esta noticia te parecio:</span>
-					<button class="vote-btn hot" data-type="hot">Alta Data</button>
-					<button class="vote-btn cold" data-type="cold">Fria</button>
+					<span class="votes-label">Esta noticia te pareció:</span>
+					<div class="vote-buttons">
+						<button class="vote-btn hot" data-type="hot">
+							<span class="vote-icon">🔥</span>
+							Alta data
+						</button>
+						<button class="vote-btn cold" data-type="cold">
+							<span class="vote-icon">❄️</span>
+							Fría
+						</button>
+					</div>
 					<span class="vote-counts"></span>
 				</div>
-				<a href="/" class="back-link">Ver mas noticias</a>
 			</footer>
+
 		</article>
 	)}
 </Layout>
 
 <script is:inline>
 	const API_BASE = 'http://localhost:8000';
-
-	// Reading Level Selector Logic
-	const levelButtons = document.querySelectorAll('.level-btn');
-	const contentDiv = document.getElementById('article-content');
-
-	if (levelButtons.length > 0 && contentDiv) {
-		// Get content from JSON script tag
-		const dataScript = document.getElementById('reading-levels-data');
-		const contentData = dataScript ? JSON.parse(dataScript.textContent) : {
-			sin_vueltas: '',
-			lo_central: '',
-			en_profundidad: ''
-		};
-
-		console.log('Reading levels available:', {
-			sin_vueltas: contentData.sin_vueltas ? contentData.sin_vueltas.substring(0, 50) + '...' : 'EMPTY',
-			lo_central: contentData.lo_central ? contentData.lo_central.substring(0, 50) + '...' : 'EMPTY',
-			en_profundidad: contentData.en_profundidad ? contentData.en_profundidad.substring(0, 50) + '...' : 'EMPTY'
-		});
-
-		// Get preferred reading level from localStorage or default to 'lo_central'
-		const savedLevel = localStorage.getItem('preferred_reading_level') || 'lo_central';
-
-		// Function to render content for a specific level
-		function renderContent(level) {
-			console.log('Rendering level:', level);
-			let content = contentData[level];
-
-			if (!content || content.trim() === '') {
-				console.warn('No content for level:', level, '- using fallback');
-				content = contentData.en_profundidad || contentData.lo_central || contentData.sin_vueltas;
-			}
-
-			console.log('Content to render (first 100 chars):', content.substring(0, 100));
-
-			// Split by newlines and create paragraphs
-			const paragraphs = content.split('\n')
-				.filter(p => p.trim())
-				.map(p => `<p>${p}</p>`)
-				.join('');
-
-			contentDiv.innerHTML = paragraphs;
-			console.log('Rendered', paragraphs.split('</p>').length - 1, 'paragraphs');
-		}
-
-		// Function to update active button
-		function updateActiveButton(level) {
-			levelButtons.forEach(btn => {
-				if (btn.getAttribute('data-level') === level) {
-					btn.classList.add('active');
-				} else {
-					btn.classList.remove('active');
-				}
-			});
-		}
-
-		// Initialize with saved level if available
-		if (savedLevel && document.querySelector(`[data-level="${savedLevel}"]`)) {
-			console.log('Initializing with saved level:', savedLevel);
-			renderContent(savedLevel);
-			updateActiveButton(savedLevel);
-		}
-
-		// Add click handlers
-		levelButtons.forEach(btn => {
-			btn.addEventListener('click', () => {
-				const level = btn.getAttribute('data-level');
-				console.log('Button clicked, level:', level);
-				if (level) {
-					renderContent(level);
-					updateActiveButton(level);
-					// Save preference to localStorage
-					localStorage.setItem('preferred_reading_level', level);
-				}
-			});
-		});
-	}
 
 	const votesDiv = document.querySelector('.votes');
 
@@ -271,11 +282,9 @@ try {
 		const hotBtn = votesDiv.querySelector('button.vote-btn.hot');
 		const coldBtn = votesDiv.querySelector('button.vote-btn.cold');
 
-		// Load initial counts and user vote from localStorage
 		const storageKey = `vote_${id}`;
 		let userVote = localStorage.getItem(storageKey);
 
-		// Function to update button states
 		function updateButtonStates(currentVote) {
 			hotBtn?.classList.remove('active');
 			coldBtn?.classList.remove('active');
@@ -287,14 +296,13 @@ try {
 			}
 		}
 
-		// Function to fetch and display vote counts
 		async function fetchVoteCounts() {
 			try {
 				const r = await fetch(`${API_BASE}/api/stats/votes/${id}`);
 				if (r.ok) {
 					const data = await r.json();
 					if (countsEl) {
-						countsEl.textContent = `🔥 ${data.hot} · ❄️ ${data.cold}`;
+						countsEl.textContent = `${data.hot} · ${data.cold}`;
 					}
 				}
 			} catch (e) {
@@ -302,17 +310,14 @@ try {
 			}
 		}
 
-		// Initialize
 		updateButtonStates(userVote);
 		fetchVoteCounts();
 
-		// Add click handlers
 		votesDiv.querySelectorAll('button.vote-btn').forEach((btn) => {
 			btn.addEventListener('click', async () => {
 				const voteType = btn.getAttribute('data-type');
 				if (!voteType || !id) return;
 
-				// Disable buttons while voting
 				hotBtn?.setAttribute('disabled', 'true');
 				coldBtn?.setAttribute('disabled', 'true');
 
@@ -327,25 +332,17 @@ try {
 
 					const data = await r.json();
 
-					// Update counts
 					if (countsEl) {
-						countsEl.textContent = `🔥 ${data.hot} · ❄️ ${data.cold}`;
+						countsEl.textContent = `${data.hot} · ${data.cold}`;
 					}
 
-					// Save vote to localStorage
 					localStorage.setItem(storageKey, voteType);
 					userVote = voteType;
-
-					// Update button states
 					updateButtonStates(userVote);
 
 				} catch (e) {
 					console.error('Error voting:', e);
-					if (countsEl) {
-						countsEl.textContent = 'Error al votar';
-					}
 				} finally {
-					// Re-enable buttons
 					hotBtn?.removeAttribute('disabled');
 					coldBtn?.removeAttribute('disabled');
 				}
@@ -355,116 +352,136 @@ try {
 </script>
 
 <style>
-	.breadcrumb { display: flex; align-items: center; gap: 8px; margin-bottom: 24px; font-size: 0.9rem; }
-	.breadcrumb a { color: var(--text-secondary); }
-	.breadcrumb a:hover { color: var(--accent-secondary); }
-	.breadcrumb .sep { color: var(--text-muted); }
-	.breadcrumb span:last-child { color: var(--text-muted); }
-
-	.error-card { padding: 48px; background: var(--bg-card); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); text-align: center; }
-	.error-card p { margin: 0 0 16px; color: var(--text-secondary); }
-	.back-btn { display: inline-block; padding: 10px 20px; background: var(--accent-primary); color: white; border-radius: var(--radius-md); font-weight: 500; }
-	.back-btn:hover { background: var(--accent-secondary); color: white; }
-
-	.article { max-width: 800px; }
-
-	.article-header { display: flex; align-items: center; gap: 16px; margin-bottom: 16px; }
-	.category { padding: 6px 14px; background: rgba(59, 130, 246, 0.15); border-radius: var(--radius-sm); font-size: 0.85rem; color: var(--accent-secondary); font-weight: 500; }
-	.date { font-size: 0.9rem; color: var(--text-muted); }
-
-	.title { margin: 0 0 20px; font-size: 2.5rem; font-weight: 800; letter-spacing: -0.5px; line-height: 1.2; }
-
-	.agent-byline {
-		display: flex;
-		align-items: center;
-		gap: 16px;
-		margin: 0 0 24px;
-		padding: 16px;
-		background: var(--bg-card);
-		border: 1px solid var(--border-subtle);
-		border-radius: var(--radius-md);
+	/* ===== BASE ===== */
+	.article {
+		max-width: 680px;
+		margin: 0 auto;
+		padding: 0 20px;
 	}
-	.agent-avatar {
-		flex-shrink: 0;
-		width: 56px;
-		height: 56px;
-		border-radius: 50%;
-		overflow: hidden;
-		background: var(--bg-secondary);
-		border: 2px solid var(--border-subtle);
-	}
-	.agent-avatar img {
-		width: 100%;
-		height: 100%;
-		object-fit: cover;
-	}
-	.agent-avatar-placeholder {
-		width: 100%;
-		height: 100%;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		font-size: 1.5rem;
-		font-weight: 700;
-		color: var(--accent-primary);
-		background: linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(147, 51, 234, 0.1) 100%);
-	}
-	.agent-info {
-		flex: 1;
-		display: flex;
-		flex-direction: column;
-		gap: 2px;
-	}
-	.agent-label {
-		font-size: 0.75rem;
-		text-transform: uppercase;
-		letter-spacing: 0.5px;
+
+	.error-state {
+		text-align: center;
+		padding: 80px 20px;
 		color: var(--text-muted);
-		font-weight: 600;
 	}
-	.agent-name {
-		font-size: 1.1rem;
+
+	.error-state .back-link {
+		display: inline-block;
+		margin-top: 16px;
+		color: var(--accent-main);
+	}
+
+	/* ===== HEADER ===== */
+	.article-header {
+		margin-bottom: 48px;
+		padding-bottom: 32px;
+		border-bottom: 1px solid var(--border-subtle);
+		border-left: 3px solid var(--accent-main);
+		padding-left: 24px;
+		margin-left: -24px;
+	}
+
+	.article-meta {
+		display: flex;
+		align-items: baseline;
+		gap: 0;
+		margin-bottom: 16px;
+		font-size: 0.8rem;
+		color: var(--text-muted);
+	}
+
+	.category {
+		color: var(--accent-muted);
+		font-weight: 500;
+		text-transform: lowercase;
+	}
+
+	.category::after {
+		content: '·';
+		margin: 0 10px;
+		color: var(--text-muted);
+		opacity: 0.5;
+	}
+
+	.editorial-state {
+		color: var(--text-muted);
+	}
+
+	.editorial-state::after {
+		content: '·';
+		margin: 0 10px;
+		opacity: 0.5;
+	}
+
+	.time {
+		color: var(--text-muted);
+		opacity: 0.8;
+	}
+
+	.title {
+		font-size: clamp(1.75rem, 5vw, 2.5rem);
 		font-weight: 700;
+		line-height: 1.15;
+		letter-spacing: -0.025em;
+		margin: 0 0 20px;
 		color: var(--text-primary);
 	}
-	.agent-specialization {
+
+	.byline {
 		font-size: 0.9rem;
-		color: var(--accent-secondary);
+		color: var(--text-muted);
+	}
+
+	.agent-name {
+		color: var(--text-secondary);
 		font-weight: 500;
 	}
 
-	.summary { margin: 0 0 24px; font-size: 1.2rem; color: var(--text-secondary); line-height: 1.6; padding: 20px; background: var(--bg-card); border-left: 4px solid var(--accent-primary); border-radius: 0 var(--radius-md) var(--radius-md) 0; }
+	.agent-spec {
+		color: var(--accent-recent);
+	}
 
-	.tags { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 32px; }
-	.tag { padding: 6px 14px; background: var(--bg-secondary); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); font-size: 0.85rem; color: var(--text-secondary); }
+	.origin-badge {
+		display: inline-flex;
+		align-items: center;
+		gap: 6px;
+		margin-top: 12px;
+		padding: 6px 12px;
+		background: rgba(56, 189, 248, 0.1);
+		border: 1px solid rgba(56, 189, 248, 0.25);
+		border-radius: 100px;
+		font-size: 0.75rem;
+		color: #38bdf8;
+		font-weight: 500;
+	}
 
-	/* Media Gallery */
+	.origin-badge svg {
+		color: #38bdf8;
+		opacity: 0.8;
+	}
+
+	/* ===== MEDIA ===== */
 	.media-gallery {
-		margin: 32px 0;
-		display: flex;
-		flex-direction: column;
-		gap: 24px;
+		margin: 0 0 48px;
 	}
+
 	.media-item {
-		width: 100%;
-		border-radius: var(--radius-lg);
-		overflow: hidden;
-		background: var(--bg-card);
-		border: 1px solid var(--border-subtle);
+		margin: 0;
 	}
+
 	.media-item img {
 		width: 100%;
 		height: auto;
 		display: block;
-		max-height: 600px;
-		object-fit: cover;
 	}
+
 	.video-wrapper {
 		position: relative;
-		padding-bottom: 56.25%; /* 16:9 aspect ratio */
+		padding-bottom: 56.25%;
 		height: 0;
 		overflow: hidden;
 	}
+
 	.video-wrapper iframe {
 		position: absolute;
 		top: 0;
@@ -472,267 +489,295 @@ try {
 		width: 100%;
 		height: 100%;
 	}
-	.media-caption {
-		padding: 12px 16px;
-		font-size: 0.9rem;
+
+	.media-item figcaption {
+		padding: 12px 0;
+		font-size: 0.85rem;
 		color: var(--text-muted);
 		font-style: italic;
-		background: var(--bg-secondary);
+		border-bottom: 1px solid var(--border-subtle);
+	}
+
+	/* ===== ESTO ES LO IMPORTANTE ===== */
+	.highlight-box {
+		margin-bottom: 48px;
+		padding: 24px 28px;
+		background: rgba(99, 102, 241, 0.06);
+		border-left: 4px solid var(--accent-main);
+		border-radius: 0 12px 12px 0;
+	}
+
+	.highlight-header {
+		display: flex;
+		align-items: center;
+		gap: 10px;
+		margin-bottom: 16px;
+	}
+
+	.highlight-icon {
+		color: var(--accent-main);
+		flex-shrink: 0;
+	}
+
+	.highlight-label {
+		font-size: 0.8rem;
+		font-weight: 700;
+		text-transform: uppercase;
+		letter-spacing: 0.04em;
+		color: var(--accent-main);
+	}
+
+	.highlight-content {
+		font-size: 1.1875rem;
+		line-height: 1.6;
+		color: var(--text-primary);
+		font-weight: 500;
+	}
+
+	.highlight-content p {
+		margin: 0 0 16px;
+	}
+
+	.highlight-content p:last-child {
+		margin-bottom: 0;
+	}
+
+	/* ===== CONTENIDO ===== */
+	.content-section {
+		margin-bottom: 48px;
+	}
+
+	.section-label {
+		font-size: 0.75rem;
+		font-weight: 600;
+		text-transform: uppercase;
+		letter-spacing: 0.05em;
+		color: var(--accent-section);
+		margin: 0 0 20px;
+		padding-bottom: 12px;
+		border-bottom: 1px solid var(--border-subtle);
+	}
+
+	.depth .section-label {
+		color: var(--accent-recent);
+	}
+
+	.content-body {
+		font-size: 1.0625rem;
+		line-height: 1.75;
+		color: var(--text-secondary);
+	}
+
+	.content-body p {
+		margin: 0 0 20px;
+	}
+
+	.content-body p:last-child {
+		margin-bottom: 0;
+	}
+
+	/* ===== TAGS ===== */
+	.tags {
+		display: flex;
+		gap: 8px;
+		flex-wrap: wrap;
+		margin-bottom: 48px;
+		padding-top: 24px;
 		border-top: 1px solid var(--border-subtle);
 	}
 
-	/* Reading Level Selector */
-	.reading-level-selector {
-		margin-bottom: 32px;
-		padding: 20px;
-		background: var(--bg-card);
-		border: 1px solid var(--border-subtle);
-		border-radius: var(--radius-md);
-	}
-
-	.level-label {
-		font-size: 0.85rem;
-		font-weight: 600;
+	.tag {
+		padding: 4px 12px;
+		font-size: 0.8rem;
 		color: var(--text-muted);
-		text-transform: uppercase;
-		letter-spacing: 0.5px;
-		margin-bottom: 12px;
+		background: var(--bg-secondary);
+		border-radius: 100px;
 	}
 
-	.level-buttons {
-		display: flex;
-		gap: 12px;
-		flex-wrap: wrap;
+	/* ===== FOOTER ===== */
+	.article-footer {
+		padding: 32px 0;
+		border-top: 1px solid var(--border-subtle);
 	}
 
-	.level-btn {
+	.votes {
 		display: flex;
 		flex-direction: column;
-		align-items: flex-start;
-		padding: 12px 16px;
-		background: var(--bg-secondary);
-		border: 2px solid var(--border-subtle);
-		border-radius: var(--radius-md);
-		cursor: pointer;
-		transition: all 0.2s;
-		min-width: 140px;
+		gap: 16px;
 	}
 
-	.level-btn:hover {
-		border-color: var(--accent-primary);
-		background: var(--bg-card-hover);
-		transform: translateY(-2px);
-		box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-	}
-
-	.level-btn.active {
-		border-color: var(--accent-primary);
-		background: rgba(59, 130, 246, 0.1);
-	}
-
-	.level-name {
-		font-size: 0.95rem;
-		font-weight: 700;
-		color: var(--text-primary);
-		margin-bottom: 2px;
-	}
-
-	.level-desc {
-		font-size: 0.75rem;
+	.votes-label {
+		font-size: 0.9rem;
 		color: var(--text-muted);
 	}
 
-	.level-btn.active .level-name {
-		color: var(--accent-primary);
+	.vote-buttons {
+		display: flex;
+		gap: 12px;
 	}
 
-	.level-btn.active .level-desc {
-		color: var(--accent-secondary);
-	}
-
-	.body-content { margin-bottom: 40px; }
-	.body-content p { margin: 0 0 16px; line-height: 1.8; color: var(--text-primary); font-size: 1.05rem; }
-
-	.article-footer { padding-top: 32px; border-top: 1px solid var(--border-subtle); display: flex; flex-direction: column; gap: 24px; }
-
-	.votes { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
-	.votes-label { color: var(--text-secondary); font-size: 0.95rem; }
 	.vote-btn {
+		display: inline-flex;
+		align-items: center;
+		gap: 8px;
 		padding: 10px 20px;
-		background: var(--bg-card);
+		background: transparent;
 		border: 1px solid var(--border-subtle);
-		border-radius: var(--radius-md);
+		border-radius: 100px;
 		color: var(--text-secondary);
-		cursor: pointer;
 		font-size: 0.9rem;
-		font-weight: 500;
+		cursor: pointer;
 		transition: all 0.2s;
-		position: relative;
 	}
+
 	.vote-btn:hover:not(:disabled) {
-		background: var(--bg-card-hover);
-		transform: translateY(-1px);
+		border-color: var(--text-muted);
 	}
+
 	.vote-btn:disabled {
-		opacity: 0.6;
+		opacity: 0.5;
 		cursor: not-allowed;
 	}
-	.vote-btn.hot:hover:not(:disabled) {
-		border-color: #f59e0b;
-		color: #f59e0b;
-	}
+
+	.vote-btn.hot:hover:not(:disabled),
 	.vote-btn.hot.active {
-		background: rgba(245, 158, 11, 0.15);
-		border-color: #f59e0b;
-		color: #f59e0b;
-		font-weight: 600;
+		border-color: var(--accent-section);
+		color: var(--accent-section);
+		background: rgba(245, 158, 11, 0.1);
 	}
-	.vote-btn.cold:hover:not(:disabled) {
-		border-color: #3b82f6;
-		color: #3b82f6;
-	}
+
+	.vote-btn.cold:hover:not(:disabled),
 	.vote-btn.cold.active {
-		background: rgba(59, 130, 246, 0.15);
-		border-color: #3b82f6;
-		color: #3b82f6;
-		font-weight: 600;
+		border-color: var(--accent-main);
+		color: var(--accent-main);
+		background: rgba(99, 102, 241, 0.1);
 	}
+
+	.vote-icon {
+		font-size: 1rem;
+	}
+
 	.vote-counts {
+		font-size: 0.85rem;
 		color: var(--text-muted);
-		font-size: 0.9rem;
-		font-weight: 500;
 	}
 
-	.back-link { color: var(--accent-secondary); font-weight: 500; }
+	/* ===== AVISO ===== */
+	.site-notice {
+		padding: 32px 0 48px;
+		border-top: 1px solid var(--border-subtle);
+		margin-top: 32px;
+	}
 
-	@media (max-width: 768px) {
-		.breadcrumb { margin-bottom: 16px; font-size: 0.85rem; }
+	.site-notice p {
+		font-size: 0.8rem;
+		line-height: 1.6;
+		color: var(--text-muted);
+		margin: 0;
+		max-width: 480px;
+		opacity: 0.7;
+	}
+
+	/* ===== COLORES ===== */
+	:root {
+		--accent-muted: #6b7280;
+		--accent-main: #6366f1;
+		--accent-recent: #10b981;
+		--accent-section: #f59e0b;
+	}
+
+	@media (prefers-color-scheme: dark) {
+		:root {
+			--accent-muted: #9ca3af;
+			--accent-main: #818cf8;
+			--accent-recent: #34d399;
+			--accent-section: #fbbf24;
+		}
+
+		.highlight-box {
+			background: rgba(129, 140, 248, 0.1);
+		}
+	}
+
+	/* ===== RESPONSIVE ===== */
+	@media (max-width: 640px) {
+		.article {
+			padding: 0 16px;
+		}
 
 		.article-header {
-			flex-direction: column;
-			align-items: flex-start;
-			gap: 8px;
-			margin-bottom: 12px;
+			margin-bottom: 32px;
+			padding-bottom: 24px;
+			padding-left: 16px;
+			margin-left: -16px;
 		}
 
 		.title {
-			font-size: 1.6rem;
-			margin-bottom: 16px;
+			font-size: 1.5rem;
 		}
 
-		.agent-byline {
-			padding: 12px;
-			gap: 12px;
+		.highlight-box {
+			padding: 20px;
+			margin-bottom: 36px;
+			margin-left: -16px;
+			margin-right: -16px;
+			border-radius: 0;
 		}
 
-		.agent-avatar {
-			width: 48px;
-			height: 48px;
+		.highlight-content {
+			font-size: 1.0625rem;
 		}
 
-		.agent-name { font-size: 1rem; }
+		.content-section {
+			margin-bottom: 36px;
+		}
 
-		.summary {
+		.content-body {
 			font-size: 1rem;
-			padding: 14px;
-			margin-bottom: 20px;
+		}
+
+		.content-body.lead {
+			font-size: 1.0625rem;
 		}
 
 		.tags {
-			gap: 6px;
-			margin-bottom: 24px;
+			margin-bottom: 32px;
+			padding-top: 20px;
 		}
 
-		.tag {
-			padding: 5px 10px;
-			font-size: 0.8rem;
-		}
-
-		/* Reading level buttons en stack vertical en móvil */
-		.reading-level-selector {
-			padding: 16px;
-			margin-bottom: 24px;
-		}
-
-		.level-buttons {
+		.vote-buttons {
 			flex-direction: column;
-			gap: 8px;
-		}
-
-		.level-btn {
-			min-width: 100%;
-			padding: 14px 16px;
-			flex-direction: row;
-			align-items: center;
-			justify-content: space-between;
-		}
-
-		.level-name { font-size: 0.9rem; }
-		.level-desc { font-size: 0.75rem; }
-
-		.body-content p {
-			font-size: 1rem;
-			line-height: 1.7;
-		}
-
-		.article-footer {
-			padding-top: 24px;
-			gap: 20px;
-		}
-
-		.votes {
-			flex-direction: column;
-			align-items: flex-start;
-			gap: 10px;
-		}
-
-		.votes-label { font-size: 0.9rem; }
-
-		.vote-btn {
-			padding: 12px 24px;
-			font-size: 0.95rem;
-		}
-
-		.media-item img {
-			max-height: 400px;
-		}
-	}
-
-	@media (max-width: 480px) {
-		.title { font-size: 1.4rem; }
-
-		.category {
-			padding: 4px 10px;
-			font-size: 0.75rem;
-		}
-
-		.date { font-size: 0.8rem; }
-
-		.summary {
-			font-size: 0.95rem;
-			padding: 12px;
-			border-left-width: 3px;
-		}
-
-		.agent-byline {
-			flex-direction: column;
-			align-items: flex-start;
-			text-align: left;
-		}
-
-		.body-content p {
-			font-size: 0.95rem;
-			margin-bottom: 14px;
 		}
 
 		.vote-btn {
-			padding: 10px 18px;
-			width: 100%;
 			justify-content: center;
 		}
 
-		.media-item img {
-			max-height: 300px;
+		.site-notice {
+			padding: 24px 0 40px;
+			margin-top: 24px;
 		}
+
+		.site-notice p {
+			font-size: 0.75rem;
+		}
+	}
+
+	/* ===== ADSENSE RECTANGLE ===== */
+	.ad-rectangle {
+		padding: 16px;
+		margin: 32px 0;
+		background: var(--bg-card);
+		border: 1px solid var(--border-subtle);
+		border-radius: 8px;
+		text-align: center;
+	}
+	.ad-rectangle::before {
+		content: 'PUBLICIDAD';
+		display: block;
+		font-size: 0.65rem;
+		color: var(--text-muted);
+		letter-spacing: 1px;
+		margin-bottom: 8px;
 	}
 </style>

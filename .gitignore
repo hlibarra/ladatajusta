@@ -56,3 +56,27 @@ build/
 *.egg-info/
 backend/examples/
 nul
+
+
+# Scraping / Playwright / Browser data
+scraping/**/.user_data/
+scraping/**/Cache/
+scraping/**/Default/
+scraping/**/Cache_Data/
+scraping/**/Code Cache/
+scraping/**/GPUCache/
+
+# Playwright / Puppeteer
+.playwright/
+playwright-report/
+
+# Scraping runtime data (DO NOT COMMIT)
+scraping/**/.user_data/
+scraping/**/storage_state.json
+scraping/**/*.csv
+scraping/**/*.json
+scraping/**/output/
+scraping/**/data/
+
+# Playwright / Puppeteer artifacts
+playwright-report/
