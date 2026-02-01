@@ -134,7 +134,8 @@ import AdminLayout from '../../../layouts/AdminLayout.astro';
 <script>
   import { authFetch } from '../../../lib/auth';
 
-  const API_BASE = import.meta.env.PUBLIC_CLIENT_API_BASE_URL || 'http://localhost:8000';
+  // Use current origin for SSE connection (works in both dev and production)
+  const API_BASE = typeof window !== 'undefined' ? window.location.origin : '';
 
   let eventSource: EventSource | null = null;
   let statusInterval: number | null = null;
