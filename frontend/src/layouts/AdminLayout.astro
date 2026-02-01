@@ -38,30 +38,36 @@ const { title = 'Admin - La Data Justa' } = Astro.props;
         <div class="sidebar-header">
           <a href="/admin" class="logo">La Data Justa</a>
           <span class="admin-badge">Admin</span>
+          <button class="sidebar-collapse-btn" id="sidebar-collapse-btn" title="Ocultar menu">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+              <polyline points="11 17 6 12 11 7"></polyline>
+              <polyline points="18 17 13 12 18 7"></polyline>
+            </svg>
+          </button>
         </div>
         <nav class="sidebar-nav">
-          <a href="/admin" class="nav-item">
+          <a href="/admin" class="nav-item" data-tooltip="Dashboard">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
               <rect x="3" y="3" width="7" height="7"></rect>
               <rect x="14" y="3" width="7" height="7"></rect>
               <rect x="14" y="14" width="7" height="7"></rect>
               <rect x="3" y="14" width="7" height="7"></rect>
             </svg>
-            Dashboard
+            <span class="nav-label">Dashboard</span>
           </a>
-          <a href="/admin/scraping" class="nav-item">
+          <a href="/admin/scraping" class="nav-item" data-tooltip="Scraping">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
               <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
             </svg>
-            Scraping
+            <span class="nav-label">Scraping</span>
           </a>
-          <a href="/admin/fuentes" class="nav-item">
+          <a href="/admin/fuentes" class="nav-item" data-tooltip="Fuentes">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
               <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/>
             </svg>
-            Fuentes
+            <span class="nav-label">Fuentes</span>
           </a>
-          <a href="/admin/noticias" class="nav-item">
+          <a href="/admin/noticias" class="nav-item" data-tooltip="Noticias">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
               <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
               <polyline points="14 2 14 8 20 8"></polyline>
@@ -69,47 +75,68 @@ const { title = 'Admin - La Data Justa' } = Astro.props;
               <line x1="16" y1="17" x2="8" y2="17"></line>
               <polyline points="10 9 9 9 8 9"></polyline>
             </svg>
-            Noticias
+            <span class="nav-label">Noticias</span>
           </a>
-          <a href="/admin/secciones" class="nav-item">
+          <a href="/admin/secciones" class="nav-item" data-tooltip="Secciones">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
               <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
               <line x1="9" y1="22" x2="9" y2="12"></line>
               <line x1="15" y1="22" x2="15" y2="12"></line>
             </svg>
-            Secciones
+            <span class="nav-label">Secciones</span>
           </a>
-          <a href="/admin/feeds" class="nav-item">
+          <a href="/admin/feeds" class="nav-item" data-tooltip="Feeds RSS">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
               <path d="M4 11a9 9 0 0 1 9 9"></path>
               <path d="M4 4a16 16 0 0 1 16 16"></path>
               <circle cx="5" cy="19" r="1"></circle>
             </svg>
-            Feeds RSS
+            <span class="nav-label">Feeds RSS</span>
           </a>
-          <a href="/admin/configuracion" class="nav-item">
+          <a href="/admin/configuracion" class="nav-item" data-tooltip="Configuracion">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
               <circle cx="12" cy="12" r="3"></circle>
               <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
             </svg>
-            Configuracion
+            <span class="nav-label">Configuracion</span>
+          </a>
+          <a href="/admin/usuarios" class="nav-item" data-tooltip="Usuarios">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
+              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+              <circle cx="9" cy="7" r="4"></circle>
+              <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+              <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+            </svg>
+            <span class="nav-label">Usuarios</span>
           </a>
         </nav>
         <div class="sidebar-footer">
-          <a href="/" class="nav-item">
+          <div class="user-info" id="user-info">
+            <div class="user-avatar">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
+                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                <circle cx="12" cy="7" r="4"></circle>
+              </svg>
+            </div>
+            <div class="user-details">
+              <span class="user-email" id="user-email">Cargando...</span>
+              <span class="user-role" id="user-role"></span>
+            </div>
+          </div>
+          <a href="/" class="nav-item" data-tooltip="Ver sitio">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
               <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
               <polyline points="9 22 9 12 15 12 15 22"></polyline>
             </svg>
-            Ver sitio
+            <span class="nav-label">Ver sitio</span>
           </a>
-          <button class="nav-item logout-btn" id="logout-btn">
+          <button class="nav-item logout-btn" id="logout-btn" data-tooltip="Cerrar sesion">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
               <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
               <polyline points="16 17 21 12 16 7"></polyline>
               <line x1="21" y1="12" x2="9" y2="12"></line>
             </svg>
-            Cerrar sesion
+            <span class="nav-label">Cerrar sesion</span>
           </button>
         </div>
       </aside>
@@ -119,12 +146,29 @@ const { title = 'Admin - La Data Justa' } = Astro.props;
     </div>
 
     <script>
-      import { isAuthenticated, logout } from '../lib/auth';
+      import { isAuthenticated, logout, authFetch } from '../lib/auth';
 
       // Check authentication
       if (!isAuthenticated()) {
         window.location.href = '/admin/login';
       }
+
+      // Load current user info
+      async function loadUserInfo() {
+        try {
+          const r = await authFetch('/api/auth/me');
+          if (r.ok) {
+            const user = await r.json();
+            const emailEl = document.getElementById('user-email');
+            const roleEl = document.getElementById('user-role');
+            if (emailEl) emailEl.textContent = user.email;
+            if (roleEl) roleEl.textContent = user.is_admin ? 'Administrador' : 'Usuario';
+          }
+        } catch (e) {
+          console.error('Error loading user info:', e);
+        }
+      }
+      loadUserInfo();
 
       // Logout button
       document.getElementById('logout-btn')?.addEventListener('click', () => {
@@ -135,6 +179,7 @@ const { title = 'Admin - La Data Justa' } = Astro.props;
       const sidebarToggle = document.getElementById('sidebar-toggle');
       const sidebar = document.getElementById('sidebar');
       const overlay = document.getElementById('sidebar-overlay');
+      const adminContainer = document.querySelector('.admin-container');
 
       function toggleSidebar() {
         sidebar?.classList.toggle('open');
@@ -160,6 +205,32 @@ const { title = 'Admin - La Data Justa' } = Astro.props;
             closeSidebar();
           }
         });
+      });
+
+      // Desktop sidebar collapse
+      const collapseBtn = document.getElementById('sidebar-collapse-btn');
+      const SIDEBAR_COLLAPSED_KEY = 'admin_sidebar_collapsed';
+
+      function setSidebarCollapsed(collapsed: boolean) {
+        if (collapsed) {
+          adminContainer?.classList.add('sidebar-collapsed');
+          collapseBtn?.setAttribute('title', 'Mostrar menu');
+        } else {
+          adminContainer?.classList.remove('sidebar-collapsed');
+          collapseBtn?.setAttribute('title', 'Ocultar menu');
+        }
+        localStorage.setItem(SIDEBAR_COLLAPSED_KEY, collapsed ? '1' : '0');
+      }
+
+      // Restore sidebar state from localStorage
+      const savedCollapsed = localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === '1';
+      if (savedCollapsed && window.innerWidth > 768) {
+        setSidebarCollapsed(true);
+      }
+
+      collapseBtn?.addEventListener('click', () => {
+        const isCollapsed = adminContainer?.classList.contains('sidebar-collapsed');
+        setSidebarCollapsed(!isCollapsed);
       });
     </script>
 
@@ -212,6 +283,15 @@ const { title = 'Admin - La Data Justa' } = Astro.props;
         height: 100vh;
         left: 0;
         top: 0;
+        transition: width 0.3s ease;
+      }
+
+      .nav-label {
+        transition: opacity 0.2s ease;
+      }
+
+      .sidebar-collapsed .nav-label {
+        display: none;
       }
 
       .sidebar-header {
@@ -220,6 +300,35 @@ const { title = 'Admin - La Data Justa' } = Astro.props;
         display: flex;
         align-items: center;
         gap: 12px;
+        position: relative;
+      }
+
+      .sidebar-collapse-btn {
+        position: absolute;
+        right: 12px;
+        top: 50%;
+        transform: translateY(-50%);
+        width: 32px;
+        height: 32px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: var(--bg-card);
+        border: 1px solid var(--border-subtle);
+        border-radius: var(--radius-md);
+        color: var(--text-muted);
+        cursor: pointer;
+        transition: all 0.2s ease;
+      }
+
+      .sidebar-collapse-btn:hover {
+        background: var(--bg-card-hover);
+        color: var(--text-primary);
+        border-color: var(--border-medium);
+      }
+
+      .sidebar-collapsed .sidebar-collapse-btn svg {
+        transform: rotate(180deg);
       }
 
       .logo {
@@ -244,6 +353,7 @@ const { title = 'Admin - La Data Justa' } = Astro.props;
         display: flex;
         flex-direction: column;
         gap: 4px;
+        overflow-y: auto;
       }
 
       .nav-item {
@@ -285,11 +395,141 @@ const { title = 'Admin - La Data Justa' } = Astro.props;
         color: var(--error);
       }
 
+      .user-info {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 12px 16px;
+        margin-bottom: 8px;
+        background: var(--bg-card);
+        border-radius: var(--radius-md);
+        border: 1px solid var(--border-subtle);
+      }
+
+      .user-avatar {
+        width: 36px;
+        height: 36px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: var(--accent-secondary);
+        color: white;
+        border-radius: 50%;
+        flex-shrink: 0;
+      }
+
+      .user-details {
+        display: flex;
+        flex-direction: column;
+        min-width: 0;
+      }
+
+      .user-email {
+        font-size: 0.85rem;
+        font-weight: 500;
+        color: var(--text-primary);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .user-role {
+        font-size: 0.75rem;
+        color: var(--text-muted);
+      }
+
       .main-content {
         flex: 1;
         margin-left: 260px;
         padding: 32px;
         min-height: 100vh;
+        transition: margin-left 0.3s ease;
+      }
+
+      /* Collapsed sidebar state */
+      .sidebar-collapsed .sidebar {
+        width: 72px;
+      }
+
+      .sidebar-collapsed .sidebar-header .logo,
+      .sidebar-collapsed .sidebar-header .admin-badge {
+        display: none;
+      }
+
+      .sidebar-collapsed .sidebar-header {
+        justify-content: center;
+        padding: 16px;
+      }
+
+      .sidebar-collapsed .sidebar-collapse-btn {
+        position: static;
+        transform: none;
+      }
+
+      .sidebar-collapsed .nav-item {
+        justify-content: center;
+        padding: 14px;
+      }
+
+      .sidebar-collapsed .nav-item svg {
+        margin: 0;
+      }
+
+      .sidebar-collapsed .nav-item:not(svg) {
+        font-size: 0;
+      }
+
+      .sidebar-collapsed .sidebar .nav-item {
+        position: relative;
+      }
+
+      .sidebar-collapsed .sidebar .nav-item::after {
+        content: attr(data-tooltip);
+        position: absolute;
+        left: 100%;
+        top: 50%;
+        transform: translateY(-50%);
+        margin-left: 12px;
+        padding: 8px 12px;
+        background: var(--text-primary);
+        color: var(--bg-primary);
+        font-size: 0.85rem;
+        white-space: nowrap;
+        border-radius: var(--radius-md);
+        opacity: 0;
+        visibility: hidden;
+        transition: all 0.2s ease;
+        z-index: 100;
+        pointer-events: none;
+      }
+
+      .sidebar-collapsed .sidebar .nav-item:hover::after {
+        opacity: 1;
+        visibility: visible;
+      }
+
+      .sidebar-collapsed .user-info {
+        flex-direction: column;
+        padding: 12px 8px;
+        gap: 0;
+      }
+
+      .sidebar-collapsed .user-details {
+        display: none;
+      }
+
+      .sidebar-collapsed .user-avatar {
+        width: 32px;
+        height: 32px;
+      }
+
+      .sidebar-collapsed .sidebar-footer .nav-item {
+        justify-content: center;
+        padding: 14px;
+      }
+
+      .sidebar-collapsed .main-content {
+        margin-left: 72px;
       }
 
       /* Common admin styles */
@@ -538,6 +778,10 @@ const { title = 'Admin - La Data Justa' } = Astro.props;
           display: flex;
         }
 
+        .sidebar-collapse-btn {
+          display: none;
+        }
+
         .sidebar {
           position: fixed;
           left: 0;
@@ -566,6 +810,48 @@ const { title = 'Admin - La Data Justa' } = Astro.props;
           margin-left: 0;
           padding: 16px;
           padding-top: 72px;
+        }
+
+        /* Reset collapsed state on mobile */
+        .sidebar-collapsed .sidebar {
+          width: 280px;
+        }
+
+        .sidebar-collapsed .main-content {
+          margin-left: 0;
+        }
+
+        .sidebar-collapsed .nav-label {
+          display: inline;
+        }
+
+        .sidebar-collapsed .sidebar-header .logo,
+        .sidebar-collapsed .sidebar-header .admin-badge {
+          display: inline;
+        }
+
+        .sidebar-collapsed .sidebar-header {
+          justify-content: flex-start;
+          padding: 20px;
+        }
+
+        .sidebar-collapsed .nav-item {
+          justify-content: flex-start;
+          padding: 12px 16px;
+        }
+
+        .sidebar-collapsed .user-info {
+          flex-direction: row;
+          padding: 12px 16px;
+          gap: 12px;
+        }
+
+        .sidebar-collapsed .user-details {
+          display: flex;
+        }
+
+        .sidebar-collapsed .sidebar .nav-item::after {
+          display: none;
         }
 
         body.sidebar-open {

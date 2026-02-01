@@ -42,5 +42,26 @@ services:
     ports:
       - "4321:4321"
 
+  scraper:
+    build:
+      context: ./scraping
+    volumes:
+      - ./scraping:/app
+      - ./frontend/public/images:/frontend_images
+    environment:
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_NAME: ladatajusta
+      DB_USER: ladatajusta
+      DB_PASSWORD: ladatajusta
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o-mini}
+      SCRAPE_INTERVAL_MINUTES: ${SCRAPE_INTERVAL_MINUTES:-60}
+      AI_PROCESS_INTERVAL_MINUTES: ${AI_PROCESS_INTERVAL_MINUTES:-30}
+      PREPARE_HOURS_AGO: ${PREPARE_HOURS_AGO:-24}
+    depends_on:
+      - db
+    restart: unless-stopped
+
 volumes:
   db_data:

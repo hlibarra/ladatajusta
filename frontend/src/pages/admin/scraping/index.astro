@@ -12,9 +12,10 @@ import AdminLayout from '../../../layouts/AdminLayout.astro';
 
   <!-- Stats Cards -->
   <div class="stats-grid" id="stats-grid">
-    <div class="stat-card">
-      <div class="stat-icon scraped">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="24" height="24">
+    <div class="stat-card stat-scraped" title="Items obtenidos de fuentes de noticias">
+      <div class="stat-glow"></div>
+      <div class="stat-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="26" height="26">
           <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
         </svg>
       </div>
@@ -22,11 +23,18 @@ import AdminLayout from '../../../layouts/AdminLayout.astro';
         <span class="stat-value" id="stat-scraped">-</span>
         <span class="stat-label">Scrapeados</span>
       </div>
+      <div class="stat-trend">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+          <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline>
+          <polyline points="17 6 23 6 23 12"></polyline>
+        </svg>
+      </div>
     </div>
 
-    <div class="stat-card">
-      <div class="stat-icon ready">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="24" height="24">
+    <div class="stat-card stat-ready" title="Esperando procesamiento por IA">
+      <div class="stat-glow"></div>
+      <div class="stat-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="26" height="26">
           <circle cx="12" cy="12" r="10"></circle>
           <polyline points="12 6 12 12 16 14"></polyline>
         </svg>
@@ -35,23 +43,36 @@ import AdminLayout from '../../../layouts/AdminLayout.astro';
         <span class="stat-value" id="stat-ready-ai">-</span>
         <span class="stat-label">Listos para IA</span>
       </div>
+      <div class="stat-trend stat-trend-waiting">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+          <path d="M5 3l14 9-14 9V3z"></path>
+        </svg>
+      </div>
     </div>
 
-    <div class="stat-card">
-      <div class="stat-icon completed">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="24" height="24">
-          <polyline points="20 6 9 17 4 12"></polyline>
+    <div class="stat-card stat-completed" title="Procesados por IA, pendientes de revisión">
+      <div class="stat-glow"></div>
+      <div class="stat-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="26" height="26">
+          <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+          <polyline points="22 4 12 14.01 9 11.01"></polyline>
         </svg>
       </div>
       <div class="stat-content">
         <span class="stat-value" id="stat-ai-completed">-</span>
         <span class="stat-label">IA Completados</span>
       </div>
+      <div class="stat-trend">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+          <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+        </svg>
+      </div>
     </div>
 
-    <div class="stat-card">
-      <div class="stat-icon published">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="24" height="24">
+    <div class="stat-card stat-published" title="Artículos publicados en el sitio">
+      <div class="stat-glow"></div>
+      <div class="stat-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="26" height="26">
           <path d="M22 2L11 13"></path>
           <path d="M22 2L15 22L11 13L2 9L22 2Z"></path>
         </svg>
@@ -60,44 +81,63 @@ import AdminLayout from '../../../layouts/AdminLayout.astro';
         <span class="stat-value" id="stat-published">-</span>
         <span class="stat-label">Publicados</span>
       </div>
+      <div class="stat-trend stat-trend-success">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+          <polyline points="20 6 9 17 4 12"></polyline>
+        </svg>
+      </div>
     </div>
   </div>
 
-  <!-- Date Quick Filters -->
-  <div class="date-filters">
-    <button id="filter-today" class="date-filter-btn active">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
-        <circle cx="12" cy="12" r="10"></circle>
-        <polyline points="12 6 12 12 16 14"></polyline>
-      </svg>
-      Hoy
-    </button>
-    <button id="filter-yesterday" class="date-filter-btn">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
-        <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
-        <line x1="16" y1="2" x2="16" y2="6"></line>
-        <line x1="8" y1="2" x2="8" y2="6"></line>
-        <line x1="3" y1="10" x2="21" y2="10"></line>
-      </svg>
-      Ayer
-    </button>
-    <button id="filter-week" class="date-filter-btn">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
-        <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
-        <line x1="16" y1="2" x2="16" y2="6"></line>
-        <line x1="8" y1="2" x2="8" y2="6"></line>
-        <line x1="3" y1="10" x2="21" y2="10"></line>
-      </svg>
-      Esta semana
-    </button>
-    <button id="filter-all-dates" class="date-filter-btn">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
-        <circle cx="12" cy="12" r="10"></circle>
-        <line x1="2" y1="12" x2="22" y2="12"></line>
-        <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
-      </svg>
-      Todos
-    </button>
+  <!-- Quick Filters Panel -->
+  <div class="quick-filters-panel">
+    <div class="quick-filters-header">
+      <div class="quick-filters-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
+          <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon>
+        </svg>
+      </div>
+      <span class="quick-filters-title">Filtros Rápidos</span>
+    </div>
+    <div class="quick-filters-content">
+      <div class="date-type-selector">
+        <span class="selector-label">Fecha de:</span>
+        <div class="selector-toggle">
+          <button class="toggle-option active" data-value="scraped" id="toggle-scraped">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+              <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+            </svg>
+            Scrapeado
+          </button>
+          <button class="toggle-option" data-value="prepared" id="toggle-prepared">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+              <polyline points="20 6 9 17 4 12"></polyline>
+            </svg>
+            Preparado
+          </button>
+        </div>
+        <select id="filter-date-type" class="filter-select-inline" style="display: none;">
+          <option value="scraped">Scrapeado</option>
+          <option value="prepared">Preparado</option>
+        </select>
+      </div>
+      <div class="date-divider"></div>
+      <div class="date-buttons">
+        <button id="filter-today" class="date-filter-btn active">
+          <div class="btn-dot"></div>
+          Hoy
+        </button>
+        <button id="filter-yesterday" class="date-filter-btn">
+          Ayer
+        </button>
+        <button id="filter-week" class="date-filter-btn">
+          7 días
+        </button>
+        <button id="filter-all-dates" class="date-filter-btn">
+          Todo
+        </button>
+      </div>
+    </div>
   </div>
 
   <!-- Filters -->
@@ -106,11 +146,14 @@ import AdminLayout from '../../../layouts/AdminLayout.astro';
       <label for="filter-status">Estado:</label>
       <select id="filter-status" class="filter-select">
         <option value="">Todos</option>
-        <option value="scraped">Scrapeado</option>
+        <option value="scraped" selected>Scrapeado</option>
         <option value="ready_for_ai">Listo para IA</option>
-        <option value="ai_completed" selected>IA completado</option>
+        <option value="ai_completed">IA completado</option>
         <option value="ready_to_publish">Listo para publicar</option>
         <option value="published">Publicado</option>
+        <option value="duplicate">Duplicado</option>
+        <option value="expired">Expirado</option>
+        <option value="discarded">Descartado</option>
         <option value="error">Error</option>
       </select>
     </div>
@@ -182,7 +225,7 @@ import AdminLayout from '../../../layouts/AdminLayout.astro';
       <table id="items-table" class="table" style="display: none;">
         <thead>
           <tr>
-            <th style="width: 100px;">Estado</th>
+            <th style="width: 180px;">Estado</th>
             <th style="width: 120px;">Medio</th>
             <th>Título</th>
             <th style="width: 120px;">Categoría</th>
@@ -237,16 +280,18 @@ import AdminLayout from '../../../layouts/AdminLayout.astro';
     retry_count: number;
     last_error: string | null;
     publication_id: string | null;
+    image_urls: string[] | null;
   }
 
   let currentPage = 0;
   const pageSize = 20;
   let totalItems = 0;
   let currentFilters = {
-    status: 'ai_completed',
+    status: 'scraped',
     source_media: 'lagaceta',
     search_text: '',
     date_filter: 'today',
+    date_type: 'scraped', // 'scraped' or 'prepared'
   };
 
   // Load stats
@@ -307,6 +352,10 @@ import AdminLayout from '../../../layouts/AdminLayout.astro';
         }
 
         params.append('date_from', fromDate.toISOString());
+        // Add date type (scraped_at or status_updated_at)
+        if (currentFilters.date_type === 'prepared') {
+          params.append('date_field', 'status_updated_at');
+        }
       }
 
       const response = await authFetch(`/api/scraping-items?${params}`);
@@ -325,9 +374,12 @@ import AdminLayout from '../../../layouts/AdminLayout.astro';
       tbody.innerHTML = data.items.map((item: ScrapingItem) => `
         <tr data-item-id="${item.id}">
           <td>
-            <span class="status-badge status-${item.status}">
-              ${getStatusLabel(item.status)}
-            </span>
+            <div class="status-cell">
+              <span class="status-badge status-${item.status}">
+                ${getStatusLabel(item.status)}
+              </span>
+              ${item.status_message ? `<div class="status-reason" title="${escapeHtml(item.status_message)}">${truncateText(item.status_message, 40)}</div>` : ''}
+            </div>
           </td>
           <td>
             <span class="media-badge">${getMediaLabel(item.source_media)}</span>
@@ -385,6 +437,17 @@ import AdminLayout from '../../../layouts/AdminLayout.astro';
     }
   }
 
+  function escapeHtml(text: string): string {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML.replace(/"/g, '&quot;');
+  }
+
+  function truncateText(text: string, maxLength: number): string {
+    if (text.length <= maxLength) return text;
+    return text.substring(0, maxLength) + '...';
+  }
+
   function getStatusLabel(status: string): string {
     const labels: Record<string, string> = {
       scraped: 'Scrapeado',
@@ -392,6 +455,9 @@ import AdminLayout from '../../../layouts/AdminLayout.astro';
       ai_completed: 'IA OK',
       ready_to_publish: 'Listo',
       published: 'Publicado',
+      duplicate: 'Duplicado',
+      expired: 'Expirado',
+      discarded: 'Descartado',
       error: 'Error',
     };
     return labels[status] || status;
@@ -483,10 +549,36 @@ import AdminLayout from '../../../layouts/AdminLayout.astro';
     }
   }
 
+  // Update date type toggle UI
+  function updateDateTypeUI(activeType: 'scraped' | 'prepared') {
+    document.querySelectorAll('.toggle-option').forEach(btn => {
+      btn.classList.remove('active');
+    });
+    const activeBtn = document.getElementById(`toggle-${activeType}`);
+    if (activeBtn) {
+      activeBtn.classList.add('active');
+    }
+  }
+
   // Event listeners
   document.addEventListener('DOMContentLoaded', () => {
     loadStats();
     loadItems();
+
+    // Date type toggle buttons
+    document.getElementById('toggle-scraped')!.addEventListener('click', () => {
+      currentFilters.date_type = 'scraped';
+      updateDateTypeUI('scraped');
+      currentPage = 0;
+      loadItems();
+    });
+
+    document.getElementById('toggle-prepared')!.addEventListener('click', () => {
+      currentFilters.date_type = 'prepared';
+      updateDateTypeUI('prepared');
+      currentPage = 0;
+      loadItems();
+    });
 
     // Date filter buttons
     document.getElementById('filter-today')!.addEventListener('click', () => {
@@ -529,8 +621,9 @@ import AdminLayout from '../../../layouts/AdminLayout.astro';
       (document.getElementById('filter-status') as HTMLSelectElement).value = '';
       (document.getElementById('filter-media') as HTMLSelectElement).value = '';
       (document.getElementById('filter-search') as HTMLInputElement).value = '';
-      currentFilters = { status: '', source_media: '', search_text: '', date_filter: 'today' };
+      currentFilters = { status: '', source_media: '', search_text: '', date_filter: 'today', date_type: 'scraped' };
       updateDateFilterUI('today');
+      updateDateTypeUI('scraped');
       currentPage = 0;
       loadItems();
     });
@@ -557,74 +650,325 @@ import AdminLayout from '../../../layouts/AdminLayout.astro';
 </script>
 
 <style>
-  .stats-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 20px;
+  /* =====================================================
+     PAGE HEADER - Professional Title Section
+     ===================================================== */
+  .page-header {
     margin-bottom: 32px;
   }
 
+  .page-title {
+    font-size: 1.85rem;
+    font-weight: 800;
+    color: var(--text-primary);
+    letter-spacing: -0.03em;
+    margin: 0 0 8px 0;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .page-title::before {
+    content: '';
+    width: 6px;
+    height: 32px;
+    background: linear-gradient(180deg, #6366f1, #4f46e5);
+    border-radius: 3px;
+  }
+
+  .page-subtitle {
+    font-size: 0.95rem;
+    color: var(--text-muted);
+    margin: 0;
+    padding-left: 18px;
+  }
+
+  /* =====================================================
+     STATS GRID - Professional Dashboard Cards
+     ===================================================== */
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 20px;
+    margin-bottom: 28px;
+  }
+
   .stat-card {
+    position: relative;
     display: flex;
     align-items: center;
     gap: 16px;
-    padding: 24px;
+    padding: 22px 24px;
     background: var(--bg-card);
     border: 1px solid var(--border-subtle);
-    border-radius: var(--radius-lg);
+    border-radius: 16px;
+    overflow: hidden;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .stat-card:hover {
+    transform: translateY(-4px);
+    border-color: var(--border-medium);
+    box-shadow: 0 12px 24px -8px rgba(0, 0, 0, 0.25);
+  }
+
+  .stat-glow {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 2px;
+    opacity: 0.8;
+  }
+
+  .stat-scraped .stat-glow {
+    background: linear-gradient(90deg, transparent, #8b5cf6, transparent);
+  }
+
+  .stat-ready .stat-glow {
+    background: linear-gradient(90deg, transparent, #3b82f6, transparent);
+  }
+
+  .stat-completed .stat-glow {
+    background: linear-gradient(90deg, transparent, #22c55e, transparent);
+  }
+
+  .stat-published .stat-glow {
+    background: linear-gradient(90deg, transparent, #10b981, transparent);
   }
 
   .stat-icon {
-    width: 48px;
-    height: 48px;
-    border-radius: var(--radius-md);
+    width: 52px;
+    height: 52px;
+    border-radius: 14px;
     display: flex;
     align-items: center;
     justify-content: center;
+    flex-shrink: 0;
+    transition: transform 0.3s ease;
   }
 
-  .stat-icon.scraped { background: rgba(139, 92, 246, 0.15); color: #8b5cf6; }
-  .stat-icon.ready { background: rgba(59, 130, 246, 0.15); color: var(--accent-secondary); }
-  .stat-icon.completed { background: rgba(34, 197, 94, 0.15); color: #22c55e; }
-  .stat-icon.published { background: rgba(16, 185, 129, 0.15); color: var(--success); }
+  .stat-card:hover .stat-icon {
+    transform: scale(1.08);
+  }
+
+  .stat-scraped .stat-icon {
+    background: linear-gradient(135deg, rgba(139, 92, 246, 0.2), rgba(139, 92, 246, 0.1));
+    color: #a78bfa;
+    box-shadow: 0 4px 12px rgba(139, 92, 246, 0.2);
+  }
+
+  .stat-ready .stat-icon {
+    background: linear-gradient(135deg, rgba(59, 130, 246, 0.2), rgba(59, 130, 246, 0.1));
+    color: #60a5fa;
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.2);
+  }
+
+  .stat-completed .stat-icon {
+    background: linear-gradient(135deg, rgba(34, 197, 94, 0.2), rgba(34, 197, 94, 0.1));
+    color: #4ade80;
+    box-shadow: 0 4px 12px rgba(34, 197, 94, 0.2);
+  }
+
+  .stat-published .stat-icon {
+    background: linear-gradient(135deg, rgba(16, 185, 129, 0.2), rgba(16, 185, 129, 0.1));
+    color: #34d399;
+    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.2);
+  }
 
   .stat-content {
     display: flex;
     flex-direction: column;
+    flex: 1;
+    min-width: 0;
   }
 
   .stat-value {
-    font-size: 1.75rem;
-    font-weight: 700;
+    font-size: 2rem;
+    font-weight: 800;
     color: var(--text-primary);
+    line-height: 1.1;
+    letter-spacing: -0.02em;
   }
 
   .stat-label {
-    font-size: 0.85rem;
+    font-size: 0.8rem;
     color: var(--text-muted);
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-top: 4px;
   }
 
-  /* Date Quick Filters */
-  .date-filters {
+  .stat-trend {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.03);
+    color: var(--text-muted);
+    opacity: 0.6;
+    transition: all 0.3s ease;
+  }
+
+  .stat-card:hover .stat-trend {
+    opacity: 1;
+    background: rgba(255, 255, 255, 0.06);
+  }
+
+  .stat-trend-success {
+    color: #10b981;
+    background: rgba(16, 185, 129, 0.1) !important;
+    opacity: 0.9 !important;
+  }
+
+  .stat-trend-waiting {
+    color: #3b82f6;
+    background: rgba(59, 130, 246, 0.1) !important;
+    opacity: 0.9 !important;
+    animation: pulse-waiting 2s ease-in-out infinite;
+  }
+
+  @keyframes pulse-waiting {
+    0%, 100% { opacity: 0.9; }
+    50% { opacity: 0.5; }
+  }
+
+  /* =====================================================
+     QUICK FILTERS PANEL - Modern Toggle Design
+     ===================================================== */
+  .quick-filters-panel {
+    display: flex;
+    align-items: center;
+    gap: 24px;
+    padding: 16px 24px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-subtle);
+    border-radius: 16px;
+    margin-bottom: 20px;
+  }
+
+  .quick-filters-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding-right: 24px;
+    border-right: 1px solid var(--border-subtle);
+  }
+
+  .quick-filters-icon {
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, rgba(99, 102, 241, 0.2), rgba(99, 102, 241, 0.1));
+    border-radius: 10px;
+    color: #818cf8;
+  }
+
+  .quick-filters-title {
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+
+  .quick-filters-content {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    flex: 1;
+  }
+
+  .date-type-selector {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .selector-label {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .selector-toggle {
+    display: flex;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-subtle);
+    border-radius: 10px;
+    padding: 4px;
+    gap: 4px;
+  }
+
+  .toggle-option {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 14px;
+    background: transparent;
+    border: none;
+    border-radius: 8px;
+    color: var(--text-muted);
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .toggle-option:hover {
+    color: var(--text-primary);
+    background: var(--bg-card-hover);
+  }
+
+  .toggle-option.active {
+    background: linear-gradient(135deg, #6366f1, #4f46e5);
+    color: white;
+    box-shadow: 0 2px 8px rgba(99, 102, 241, 0.4);
+  }
+
+  .toggle-option svg {
+    opacity: 0.7;
+  }
+
+  .toggle-option.active svg {
+    opacity: 1;
+  }
+
+  .date-divider {
+    width: 1px;
+    height: 32px;
+    background: var(--border-subtle);
+  }
+
+  .date-buttons {
     display: flex;
     gap: 8px;
-    margin-bottom: 16px;
-    flex-wrap: wrap;
   }
 
   .date-filter-btn {
+    position: relative;
     display: inline-flex;
     align-items: center;
     gap: 8px;
     padding: 10px 18px;
-    background: var(--bg-card);
-    border: 2px solid var(--border-subtle);
-    border-radius: 24px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-subtle);
+    border-radius: 10px;
     color: var(--text-secondary);
-    font-size: 0.9rem;
+    font-size: 0.85rem;
     font-weight: 600;
     cursor: pointer;
-    transition: all 0.2s ease;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
   }
 
   .date-filter-btn:hover {
@@ -635,29 +979,41 @@ import AdminLayout from '../../../layouts/AdminLayout.astro';
   }
 
   .date-filter-btn.active {
-    background: linear-gradient(135deg, rgba(59, 130, 246, 0.15), rgba(99, 102, 241, 0.1));
-    border-color: var(--accent-secondary);
-    color: var(--accent-secondary);
-    box-shadow: 0 2px 8px rgba(59, 130, 246, 0.2);
+    background: linear-gradient(135deg, rgba(99, 102, 241, 0.15), rgba(99, 102, 241, 0.1));
+    border-color: #6366f1;
+    color: #818cf8;
+    box-shadow: 0 2px 8px rgba(99, 102, 241, 0.2);
   }
 
-  .date-filter-btn svg {
-    opacity: 0.7;
+  .btn-dot {
+    width: 6px;
+    height: 6px;
+    background: #10b981;
+    border-radius: 50%;
+    animation: pulse-dot 2s ease-in-out infinite;
   }
 
-  .date-filter-btn.active svg {
-    opacity: 1;
+  @keyframes pulse-dot {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.6; transform: scale(0.85); }
   }
 
+  .filter-select-inline {
+    display: none;
+  }
+
+  /* =====================================================
+     FILTERS BAR - Enhanced Search & Filters
+     ===================================================== */
   .filters-bar {
     display: flex;
     gap: 16px;
     align-items: flex-end;
-    padding: 20px;
+    padding: 20px 24px;
     background: var(--bg-card);
     border: 1px solid var(--border-subtle);
-    border-radius: var(--radius-lg);
-    margin-bottom: 20px;
+    border-radius: 16px;
+    margin-bottom: 24px;
     flex-wrap: wrap;
   }
 
@@ -670,32 +1026,108 @@ import AdminLayout from '../../../layouts/AdminLayout.astro';
   }
 
   .filter-group label {
-    font-size: 0.85rem;
-    font-weight: 500;
-    color: var(--text-secondary);
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
   }
 
   .filter-select,
   .filter-input {
-    padding: 10px 12px;
+    padding: 12px 16px;
     background: var(--bg-secondary);
     border: 1px solid var(--border-subtle);
-    border-radius: var(--radius-md);
+    border-radius: 10px;
     color: var(--text-primary);
     font-size: 0.9rem;
+    font-weight: 500;
+    transition: all 0.2s ease;
+  }
+
+  .filter-select:hover,
+  .filter-input:hover {
+    border-color: var(--border-medium);
   }
 
   .filter-select:focus,
   .filter-input:focus {
     outline: none;
-    border-color: var(--accent-secondary);
+    border-color: #6366f1;
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
+  }
+
+  .filter-input::placeholder {
+    color: var(--text-muted);
+    opacity: 0.6;
+  }
+
+  .filters-bar .btn {
+    height: 46px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .filters-bar .btn-primary {
+    background: linear-gradient(135deg, #6366f1, #4f46e5);
+    border: none;
+    box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+  }
+
+  .filters-bar .btn-primary:hover {
+    background: linear-gradient(135deg, #4f46e5, #4338ca);
+    box-shadow: 0 6px 16px rgba(99, 102, 241, 0.4);
+    transform: translateY(-1px);
+  }
+
+  .filters-bar .btn-secondary {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-subtle);
+    color: var(--text-secondary);
+  }
+
+  .filters-bar .btn-secondary:hover {
+    background: var(--bg-card-hover);
+    border-color: var(--border-medium);
+    color: var(--text-primary);
+  }
+
+  /* =====================================================
+     TABLE SECTION - Professional Data Display
+     ===================================================== */
+  .card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-subtle);
+    border-radius: 20px;
+    padding: 28px;
   }
 
   .table-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 20px;
+    margin-bottom: 24px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid var(--border-subtle);
+  }
+
+  .card-title {
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    letter-spacing: -0.01em;
+  }
+
+  .card-title::before {
+    content: '';
+    width: 4px;
+    height: 20px;
+    background: linear-gradient(180deg, #6366f1, #4f46e5);
+    border-radius: 2px;
   }
 
   .table-actions {
@@ -704,8 +1136,23 @@ import AdminLayout from '../../../layouts/AdminLayout.astro';
   }
 
   .btn-sm {
-    padding: 8px 16px;
+    padding: 10px 18px;
     font-size: 0.85rem;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-subtle);
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .btn-sm:hover {
+    background: var(--bg-card-hover);
+    border-color: var(--border-medium);
+    color: var(--text-primary);
   }
 
   .table-container {
@@ -719,134 +1166,364 @@ import AdminLayout from '../../../layouts/AdminLayout.astro';
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    padding: 60px 20px;
+    padding: 80px 20px;
     color: var(--text-muted);
   }
 
-  .spinner {
-    width: 40px;
-    height: 40px;
-    border: 3px solid var(--border-subtle);
-    border-top-color: var(--accent-secondary);
-    border-radius: 50%;
-    animation: spin 1s linear infinite;
+  .empty-state svg {
+    opacity: 0.3;
     margin-bottom: 16px;
+  }
+
+  .empty-state p {
+    font-size: 1rem;
+    font-weight: 500;
+  }
+
+  .spinner {
+    width: 44px;
+    height: 44px;
+    border: 3px solid var(--border-subtle);
+    border-top-color: #6366f1;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    margin-bottom: 20px;
   }
 
   @keyframes spin {
     to { transform: rotate(360deg); }
   }
 
-  .status-badge {
-    display: inline-block;
-    padding: 6px 12px;
-    border-radius: 16px;
-    font-size: 0.75rem;
+  /* =====================================================
+     TABLE STYLES - Modern Data Grid
+     ===================================================== */
+  .table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+  }
+
+  .table thead th {
+    padding: 14px 16px;
+    font-size: 0.7rem;
     font-weight: 700;
     text-transform: uppercase;
-    letter-spacing: 0.05em;
-    border: 1.5px solid;
+    letter-spacing: 0.1em;
+    color: var(--text-muted);
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border-subtle);
+    text-align: left;
+  }
+
+  .table thead th:first-child {
+    border-radius: 10px 0 0 0;
+  }
+
+  .table thead th:last-child {
+    border-radius: 0 10px 0 0;
+  }
+
+  .table tbody tr {
+    transition: all 0.2s ease;
+  }
+
+  .table tbody tr:hover {
+    background: var(--bg-card-hover);
+  }
+
+  .table tbody td {
+    padding: 16px;
+    border-bottom: 1px solid var(--border-subtle);
+    vertical-align: middle;
+  }
+
+  /* =====================================================
+     STATUS BADGES - Vibrant Status Indicators
+     ===================================================== */
+  .status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 7px 14px;
+    border-radius: 20px;
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    border: 1px solid;
+    transition: all 0.2s ease;
+  }
+
+  .status-badge::before {
+    content: '';
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    flex-shrink: 0;
   }
 
   .status-scraped {
-    background: rgba(139, 92, 246, 0.12);
-    color: #8b5cf6;
+    background: linear-gradient(135deg, rgba(139, 92, 246, 0.15), rgba(139, 92, 246, 0.08));
+    color: #a78bfa;
     border-color: rgba(139, 92, 246, 0.3);
   }
+  .status-scraped::before { background: #a78bfa; box-shadow: 0 0 6px #8b5cf6; }
 
   .status-ready_for_ai {
-    background: rgba(59, 130, 246, 0.12);
-    color: var(--accent-secondary);
+    background: linear-gradient(135deg, rgba(59, 130, 246, 0.15), rgba(59, 130, 246, 0.08));
+    color: #60a5fa;
     border-color: rgba(59, 130, 246, 0.3);
   }
+  .status-ready_for_ai::before { background: #60a5fa; box-shadow: 0 0 6px #3b82f6; animation: pulse-status 2s ease-in-out infinite; }
 
   .status-ai_completed {
-    background: rgba(34, 197, 94, 0.12);
-    color: #22c55e;
+    background: linear-gradient(135deg, rgba(34, 197, 94, 0.15), rgba(34, 197, 94, 0.08));
+    color: #4ade80;
     border-color: rgba(34, 197, 94, 0.3);
   }
+  .status-ai_completed::before { background: #4ade80; box-shadow: 0 0 6px #22c55e; }
 
   .status-ready_to_publish {
-    background: rgba(16, 185, 129, 0.12);
-    color: var(--success);
-    border-color: rgba(16, 185, 129, 0.3);
+    background: linear-gradient(135deg, rgba(16, 185, 129, 0.2), rgba(16, 185, 129, 0.1));
+    color: #34d399;
+    border-color: rgba(16, 185, 129, 0.4);
   }
+  .status-ready_to_publish::before { background: #34d399; box-shadow: 0 0 8px #10b981; animation: pulse-status 1.5s ease-in-out infinite; }
 
   .status-published {
-    background: rgba(16, 185, 129, 0.12);
-    color: var(--success);
+    background: linear-gradient(135deg, rgba(16, 185, 129, 0.15), rgba(16, 185, 129, 0.08));
+    color: #34d399;
     border-color: rgba(16, 185, 129, 0.3);
   }
+  .status-published::before { background: #34d399; box-shadow: 0 0 6px #10b981; }
 
   .status-error {
-    background: rgba(239, 68, 68, 0.12);
-    color: var(--error);
+    background: linear-gradient(135deg, rgba(239, 68, 68, 0.15), rgba(239, 68, 68, 0.08));
+    color: #f87171;
     border-color: rgba(239, 68, 68, 0.3);
   }
+  .status-error::before { background: #f87171; box-shadow: 0 0 6px #ef4444; animation: pulse-error 1s ease-in-out infinite; }
 
-  .media-badge {
-    display: inline-block;
-    padding: 6px 12px;
+  .status-duplicate {
+    background: linear-gradient(135deg, rgba(156, 163, 175, 0.15), rgba(156, 163, 175, 0.08));
+    color: #9ca3af;
+    border-color: rgba(156, 163, 175, 0.3);
+  }
+  .status-duplicate::before { background: #9ca3af; }
+
+  .status-expired {
+    background: linear-gradient(135deg, rgba(245, 158, 11, 0.15), rgba(245, 158, 11, 0.08));
+    color: #fbbf24;
+    border-color: rgba(245, 158, 11, 0.3);
+  }
+  .status-expired::before { background: #fbbf24; }
+
+  .status-discarded {
+    background: linear-gradient(135deg, rgba(107, 114, 128, 0.15), rgba(107, 114, 128, 0.08));
+    color: #6b7280;
+    border-color: rgba(107, 114, 128, 0.3);
+    text-decoration: line-through;
+    opacity: 0.7;
+  }
+  .status-discarded::before { background: #6b7280; }
+
+  @keyframes pulse-status {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+  }
+
+  @keyframes pulse-error {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.6; transform: scale(0.9); }
+  }
+
+  .status-cell {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .status-reason {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    max-width: 160px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    cursor: help;
+    padding: 5px 10px;
     background: var(--bg-secondary);
-    border: 1.5px solid var(--border-subtle);
-    border-radius: 16px;
-    font-size: 0.8rem;
-    font-weight: 600;
+    border-radius: 6px;
+    border: 1px solid var(--border-subtle);
+    transition: all 0.2s ease;
+  }
+
+  .status-reason:hover {
     color: var(--text-secondary);
+    background: var(--bg-card-hover);
+    border-color: var(--border-medium);
+  }
+
+  /* =====================================================
+     OTHER BADGES
+     ===================================================== */
+  .media-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 7px 14px;
+    background: linear-gradient(135deg, rgba(99, 102, 241, 0.1), rgba(99, 102, 241, 0.05));
+    border: 1px solid rgba(99, 102, 241, 0.2);
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: #a5b4fc;
+    letter-spacing: 0.02em;
   }
 
   .category-badge {
-    display: inline-block;
-    padding: 6px 12px;
-    background: rgba(99, 102, 241, 0.12);
-    color: #6366f1;
-    border: 1.5px solid rgba(99, 102, 241, 0.3);
-    border-radius: 16px;
-    font-size: 0.8rem;
+    display: inline-flex;
+    align-items: center;
+    padding: 7px 14px;
+    background: linear-gradient(135deg, rgba(236, 72, 153, 0.12), rgba(236, 72, 153, 0.06));
+    color: #f472b6;
+    border: 1px solid rgba(236, 72, 153, 0.25);
+    border-radius: 20px;
+    font-size: 0.75rem;
     font-weight: 700;
     letter-spacing: 0.02em;
   }
 
   .item-title {
-    font-weight: 500;
+    font-weight: 600;
     color: var(--text-primary);
     margin-bottom: 4px;
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 10px;
+    line-height: 1.4;
   }
 
   .has-image-icon {
     flex-shrink: 0;
     color: #10b981;
-    opacity: 0.8;
+    opacity: 0.9;
+    background: rgba(16, 185, 129, 0.1);
+    padding: 4px;
+    border-radius: 6px;
   }
 
   .item-section {
-    font-size: 0.8rem;
+    font-size: 0.75rem;
     color: var(--text-muted);
+    padding: 3px 8px;
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 4px;
+    display: inline-block;
+    margin-top: 4px;
   }
 
   .item-date {
-    font-size: 0.85rem;
-    color: var(--text-secondary);
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
   }
 
-  /* Action button styles are defined globally in AdminLayout */
+  .text-muted {
+    color: var(--text-muted);
+    opacity: 0.6;
+  }
 
+  /* =====================================================
+     ACTION BUTTONS - In-row Actions
+     ===================================================== */
+  .action-buttons {
+    display: flex;
+    gap: 8px;
+  }
+
+  .action-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 7px 12px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-subtle);
+    border-radius: 8px;
+    color: var(--text-secondary);
+    font-size: 0.75rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .action-btn:hover {
+    background: var(--bg-card-hover);
+    border-color: var(--border-medium);
+    color: var(--text-primary);
+    transform: translateY(-1px);
+  }
+
+  .action-btn-view:hover {
+    border-color: #6366f1;
+    color: #818cf8;
+    background: rgba(99, 102, 241, 0.1);
+  }
+
+  .action-btn-publish {
+    background: linear-gradient(135deg, rgba(16, 185, 129, 0.1), rgba(16, 185, 129, 0.05));
+    border-color: rgba(16, 185, 129, 0.3);
+    color: #34d399;
+  }
+
+  .action-btn-publish:hover {
+    background: linear-gradient(135deg, rgba(16, 185, 129, 0.2), rgba(16, 185, 129, 0.1));
+    border-color: rgba(16, 185, 129, 0.5);
+    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.2);
+  }
+
+  /* =====================================================
+     PAGINATION
+     ===================================================== */
   .pagination {
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 20px;
-    padding-top: 20px;
+    gap: 16px;
+    padding-top: 24px;
     border-top: 1px solid var(--border-subtle);
-    margin-top: 20px;
+    margin-top: 24px;
+  }
+
+  .pagination .btn-secondary {
+    padding: 10px 20px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-subtle);
+    color: var(--text-secondary);
+    font-weight: 600;
+    cursor: pointer;
+    border-radius: 8px;
+  }
+
+  .pagination .btn-secondary:hover:not(:disabled) {
+    background: var(--bg-card-hover);
+    border-color: var(--border-medium);
+    color: var(--text-primary);
+  }
+
+  .pagination .btn-secondary:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
   }
 
   .pagination-info {
-    font-size: 0.9rem;
+    font-size: 0.85rem;
     color: var(--text-secondary);
+    font-weight: 600;
+    padding: 8px 16px;
+    background: var(--bg-secondary);
+    border-radius: 8px;
+    font-variant-numeric: tabular-nums;
   }
 
   /* Modal */
@@ -1263,9 +1940,109 @@ import AdminLayout from '../../../layouts/AdminLayout.astro';
     color: var(--text-primary) !important;
   }
 
+  /* =====================================================
+     RESPONSIVE DESIGN
+     ===================================================== */
+  @media (max-width: 1200px) {
+    .stats-grid {
+      grid-template-columns: repeat(2, 1fr);
+    }
+  }
+
+  @media (max-width: 900px) {
+    .quick-filters-panel {
+      flex-direction: column;
+      align-items: stretch;
+      gap: 16px;
+    }
+
+    .quick-filters-header {
+      border-right: none;
+      border-bottom: 1px solid var(--border-subtle);
+      padding-right: 0;
+      padding-bottom: 16px;
+    }
+
+    .quick-filters-content {
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .date-type-selector {
+      justify-content: space-between;
+    }
+
+    .date-divider {
+      width: 100%;
+      height: 1px;
+    }
+
+    .date-buttons {
+      justify-content: center;
+    }
+
+    .filters-bar {
+      flex-direction: column;
+    }
+
+    .filter-group {
+      width: 100%;
+    }
+  }
+
   @media (max-width: 768px) {
     .stats-grid {
       grid-template-columns: 1fr;
+      gap: 12px;
+    }
+
+    .stat-card {
+      padding: 18px 20px;
+    }
+
+    .stat-value {
+      font-size: 1.65rem;
+    }
+
+    .stat-icon {
+      width: 46px;
+      height: 46px;
+    }
+
+    .quick-filters-panel {
+      padding: 16px;
+    }
+
+    .selector-toggle {
+      flex-wrap: wrap;
+    }
+
+    .date-buttons {
+      flex-wrap: wrap;
+    }
+
+    .card {
+      padding: 20px;
+      border-radius: 16px;
+    }
+
+    .table thead th {
+      font-size: 0.65rem;
+      padding: 10px 12px;
+    }
+
+    .table tbody td {
+      padding: 12px;
+    }
+
+    .action-buttons {
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .action-btn {
+      width: 100%;
+      justify-content: center;
     }
 
     .modal {
@@ -1336,4 +2113,5 @@ import AdminLayout from '../../../layouts/AdminLayout.astro';
       justify-content: center !important;
     }
   }
+
 </style>

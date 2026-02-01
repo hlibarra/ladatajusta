@@ -223,6 +223,7 @@ async def list_scraping_items(
     source_media: str | None = Query(None, description="Filter by source media"),
     date_from: datetime | None = Query(None, description="Filter articles from this date"),
     date_to: datetime | None = Query(None, description="Filter articles until this date"),
+    date_field: str | None = Query(None, description="Field to filter by date: scraped_at or status_updated_at"),
     search_text: str | None = Query(None, description="Search in title or content"),
     scraper_name: str | None = Query(None, description="Filter by scraper name"),
     has_errors: bool | None = Query(None, description="Filter items with errors"),
@@ -236,7 +237,8 @@ async def list_scraping_items(
     Filters:
     - status: scraped, pending_review, ready_for_ai, processing_ai, ai_completed, ready_to_publish, published, discarded, error, duplicate
     - source_media: lagaceta, clarin, infobae, etc
-    - date_from/date_to: Filter by article_date
+    - date_from/date_to: Filter by date (use date_field to select which field)
+    - date_field: Which date field to filter (scraped_at or status_updated_at)
     - search_text: Full-text search in title or content
     - scraper_name: Filter by scraper
     - has_errors: Show only items with errors
@@ -251,11 +253,14 @@ async def list_scraping_items(
     if source_media:
         conditions.append(ScrapingItem.source_media == source_media)
 
+    # Determine which date field to filter by
+    date_column = ScrapingItem.status_updated_at if date_field == "status_updated_at" else ScrapingItem.scraped_at
+
     if date_from:
-        conditions.append(ScrapingItem.scraped_at >= date_from)
+        conditions.append(date_column >= date_from)
 
     if date_to:
-        conditions.append(ScrapingItem.scraped_at <= date_to)
+        conditions.append(date_column <= date_to)
 
     if scraper_name:
         conditions.append(ScrapingItem.scraper_name == scraper_name)
