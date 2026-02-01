@@ -29,12 +29,17 @@ RUN pip install --no-cache-dir \
     playwright \
     httpx \
     trafilatura \
-    beautifulsoup4
+    beautifulsoup4 \
+    aiohttp \
+    feedparser
 
 # Install Playwright browsers
 RUN playwright install chromium
 
 # Copy scraping code
 COPY . .
+
+# Expose control server port
+EXPOSE 8080
 
 CMD ["python", "scraper_service.py"]

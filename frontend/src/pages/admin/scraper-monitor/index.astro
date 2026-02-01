@@ -1,0 +1,974 @@
+---
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+---
+
+<AdminLayout title="Monitor del Scraper - Admin">
+  <div class="container">
+    <div class="header">
+      <h1 class="page-title">Monitor del Scraper</h1>
+      <div class="header-status">
+        <span id="service-status" class="status-badge">Conectando...</span>
+        <span id="uptime" class="uptime">-</span>
+      </div>
+    </div>
+
+    <!-- Timeline / Current Activity -->
+    <div class="activity-section">
+      <div class="activity-card" id="activity-card">
+        <div class="activity-icon" id="activity-icon">
+          <div class="icon-idle">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="32" height="32">
+              <circle cx="12" cy="12" r="10"/>
+              <polyline points="12 6 12 12 16 14"/>
+            </svg>
+          </div>
+          <div class="icon-working" style="display: none;">
+            <div class="spinner-large"></div>
+          </div>
+        </div>
+        <div class="activity-content">
+          <div id="activity-title" class="activity-title">En espera</div>
+          <div id="activity-detail" class="activity-detail">Proximo ciclo en -</div>
+        </div>
+      </div>
+
+      <!-- Pipeline Steps -->
+      <div class="pipeline">
+        <div class="pipeline-step" id="step-scraping" data-status="idle">
+          <div class="step-indicator"></div>
+          <div class="step-content">
+            <div class="step-title">Scraping</div>
+            <div class="step-detail" id="step-scraping-detail">-</div>
+          </div>
+        </div>
+        <div class="pipeline-connector"></div>
+        <div class="pipeline-step" id="step-ai" data-status="idle">
+          <div class="step-indicator"></div>
+          <div class="step-content">
+            <div class="step-title">Procesamiento IA</div>
+            <div class="step-detail" id="step-ai-detail">-</div>
+          </div>
+        </div>
+        <div class="pipeline-connector"></div>
+        <div class="pipeline-step" id="step-prepare" data-status="idle">
+          <div class="step-indicator"></div>
+          <div class="step-content">
+            <div class="step-title">Auto-Prepare</div>
+            <div class="step-detail" id="step-prepare-detail">-</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Quick Actions -->
+    <div class="actions-section">
+      <button id="btn-run-now" class="action-btn primary">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
+          <polygon points="5 3 19 12 5 21 5 3"/>
+        </svg>
+        <span>Ejecutar Ciclo Completo</span>
+      </button>
+      <button id="btn-process-ai" class="action-btn secondary">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
+          <path d="M12 2a2 2 0 0 1 2 2c0 .74-.4 1.39-1 1.73V7h1a7 7 0 0 1 7 7h1a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-1v1a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-1H2a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1h1a7 7 0 0 1 7-7h1V5.73c-.6-.34-1-.99-1-1.73a2 2 0 0 1 2-2"/>
+        </svg>
+        <span>Solo IA + Prepare</span>
+      </button>
+    </div>
+
+    <!-- Stats Row -->
+    <div class="stats-row">
+      <div class="stat-item">
+        <span class="stat-value" id="items-scraped">0</span>
+        <span class="stat-label">Scrapeados</span>
+      </div>
+      <div class="stat-item">
+        <span class="stat-value" id="items-ai">0</span>
+        <span class="stat-label">IA Procesados</span>
+      </div>
+      <div class="stat-item">
+        <span class="stat-value" id="items-prepared">0</span>
+        <span class="stat-label">Preparados</span>
+      </div>
+    </div>
+
+    <!-- Sources Selection (Collapsible) -->
+    <details class="sources-panel">
+      <summary>Fuentes a Scrapear</summary>
+      <div id="sources-list" class="sources-list">
+        <span class="loading-text">Cargando...</span>
+      </div>
+      <div class="sources-actions">
+        <button id="btn-select-all" class="btn-sm">Todas</button>
+        <button id="btn-select-none" class="btn-sm">Ninguna</button>
+      </div>
+    </details>
+
+    <!-- Config (Collapsible) -->
+    <details class="config-panel">
+      <summary>Configuracion</summary>
+      <div class="config-form">
+        <div class="config-group">
+          <label>Intervalo Scraping (min)</label>
+          <input type="number" id="config-scrape-interval" min="1" value="60" />
+        </div>
+        <div class="config-group">
+          <label>Intervalo IA (min)</label>
+          <input type="number" id="config-ai-interval" min="1" value="30" />
+        </div>
+        <button id="btn-save-config" class="btn-sm primary">Guardar</button>
+      </div>
+    </details>
+
+    <!-- Live Logs (Collapsible) -->
+    <details class="logs-panel" open>
+      <summary>
+        Logs en Vivo
+        <span id="connection-indicator" class="connection-indicator"></span>
+      </summary>
+      <div id="logs-content" class="logs-content"></div>
+    </details>
+  </div>
+</AdminLayout>
+
+<script>
+  import { authFetch } from '../../../lib/auth';
+
+  const API_BASE = import.meta.env.PUBLIC_CLIENT_API_BASE_URL || 'http://localhost:8000';
+
+  let eventSource: EventSource | null = null;
+  let statusInterval: number | null = null;
+
+  // Sources state
+  interface Source {
+    id: string;
+    name: string;
+    slug: string;
+    is_active: boolean;
+  }
+  let sources: Source[] = [];
+  let configSelectedSourceIds: string[] | null = null;
+
+  // Load sources
+  async function loadSources() {
+    try {
+      const configResponse = await authFetch('/api/scraper/config');
+      if (configResponse.ok) {
+        const config = await configResponse.json();
+        configSelectedSourceIds = config.selected_source_ids || null;
+      }
+
+      const response = await authFetch('/api/scraping-sources');
+      if (!response.ok) throw new Error('Failed to load sources');
+      sources = await response.json();
+      renderSources();
+    } catch (error) {
+      console.error('Error loading sources:', error);
+    }
+  }
+
+  function renderSources() {
+    const container = document.getElementById('sources-list')!;
+    if (sources.length === 0) {
+      container.innerHTML = '<span class="no-sources">No hay fuentes</span>';
+      return;
+    }
+
+    container.innerHTML = sources.map(source => {
+      const isChecked = configSelectedSourceIds !== null
+        ? configSelectedSourceIds.includes(source.id)
+        : source.is_active;
+      return `
+        <label class="source-item">
+          <input type="checkbox" name="source" value="${source.id}" ${isChecked ? 'checked' : ''} />
+          <span>${source.name}</span>
+        </label>
+      `;
+    }).join('');
+
+    container.querySelectorAll<HTMLInputElement>('input[name="source"]').forEach(cb => {
+      cb.addEventListener('change', saveSourceSelection);
+    });
+  }
+
+  async function saveSourceSelection() {
+    const checkboxes = document.querySelectorAll<HTMLInputElement>('input[name="source"]:checked');
+    const selectedIds = Array.from(checkboxes).map(cb => cb.value);
+    const idsToSave = selectedIds.length === sources.length ? null : selectedIds;
+
+    try {
+      await authFetch('/api/scraper/config', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ selected_source_ids: idsToSave })
+      });
+      configSelectedSourceIds = idsToSave;
+    } catch (error) {
+      console.error('Error saving sources:', error);
+    }
+  }
+
+  function selectAllSources() {
+    document.querySelectorAll<HTMLInputElement>('input[name="source"]').forEach(cb => cb.checked = true);
+    saveSourceSelection();
+  }
+
+  function selectNoSources() {
+    document.querySelectorAll<HTMLInputElement>('input[name="source"]').forEach(cb => cb.checked = false);
+    saveSourceSelection();
+  }
+
+  function getSelectedSourceIds(): string[] {
+    const checkboxes = document.querySelectorAll<HTMLInputElement>('input[name="source"]:checked');
+    return Array.from(checkboxes).map(cb => cb.value);
+  }
+
+  // Format time
+  function formatUptime(seconds: number): string {
+    const hours = Math.floor(seconds / 3600);
+    const mins = Math.floor((seconds % 3600) / 60);
+    return hours > 0 ? `${hours}h ${mins}m` : `${mins}m`;
+  }
+
+  function formatTime(isoString: string | null): string {
+    if (!isoString) return '-';
+    const date = new Date(isoString);
+    return date.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
+  }
+
+  // Update UI based on status
+  function updateUI(status: any) {
+    // Service status
+    const statusBadge = document.getElementById('service-status')!;
+    statusBadge.textContent = status.status === 'running' ? 'Activo' :
+                              status.status === 'stopped' ? 'Detenido' : 'Iniciando';
+    statusBadge.className = `status-badge ${status.status}`;
+
+    // Uptime
+    document.getElementById('uptime')!.textContent = `Uptime: ${formatUptime(status.uptime_seconds)}`;
+
+    // Stats
+    document.getElementById('items-scraped')!.textContent = status.items_processed.scraped.toLocaleString();
+    document.getElementById('items-ai')!.textContent = status.items_processed.ai_processed.toLocaleString();
+    document.getElementById('items-prepared')!.textContent = status.items_processed.prepared.toLocaleString();
+
+    // Activity card
+    const activityCard = document.getElementById('activity-card')!;
+    const activityTitle = document.getElementById('activity-title')!;
+    const activityDetail = document.getElementById('activity-detail')!;
+    const iconIdle = activityCard.querySelector('.icon-idle') as HTMLElement;
+    const iconWorking = activityCard.querySelector('.icon-working') as HTMLElement;
+
+    // Pipeline steps
+    const stepScraping = document.getElementById('step-scraping')!;
+    const stepAI = document.getElementById('step-ai')!;
+    const stepPrepare = document.getElementById('step-prepare')!;
+
+    // Reset all steps
+    [stepScraping, stepAI, stepPrepare].forEach(step => step.setAttribute('data-status', 'idle'));
+
+    const currentTask = status.current_task;
+
+    if (currentTask) {
+      activityCard.classList.add('active');
+      iconIdle.style.display = 'none';
+      iconWorking.style.display = 'block';
+
+      if (currentTask.includes('Scraping')) {
+        activityTitle.textContent = 'Scraping en progreso';
+        activityDetail.textContent = status.current_source || 'Procesando fuentes...';
+        stepScraping.setAttribute('data-status', 'active');
+        document.getElementById('step-scraping-detail')!.textContent = status.current_source || 'Ejecutando...';
+      } else if (currentTask.includes('Preparing for AI')) {
+        activityTitle.textContent = 'Preparando para IA';
+        activityDetail.textContent = 'Marcando items para procesar...';
+        stepScraping.setAttribute('data-status', 'done');
+      } else if (currentTask.includes('AI Processing')) {
+        activityTitle.textContent = 'Procesando con IA';
+        activityDetail.textContent = 'Analizando contenido...';
+        stepScraping.setAttribute('data-status', 'done');
+        stepAI.setAttribute('data-status', 'active');
+        document.getElementById('step-ai-detail')!.textContent = 'Ejecutando...';
+      } else if (currentTask.includes('Auto-Prepare')) {
+        activityTitle.textContent = 'Auto-Prepare';
+        activityDetail.textContent = 'Verificando calidad y duplicados...';
+        stepScraping.setAttribute('data-status', 'done');
+        stepAI.setAttribute('data-status', 'done');
+        stepPrepare.setAttribute('data-status', 'active');
+        document.getElementById('step-prepare-detail')!.textContent = 'Ejecutando...';
+      } else {
+        activityTitle.textContent = currentTask;
+        activityDetail.textContent = '';
+      }
+
+      // Disable buttons while working
+      setButtonsDisabled(true);
+    } else {
+      activityCard.classList.remove('active');
+      iconIdle.style.display = 'block';
+      iconWorking.style.display = 'none';
+      activityTitle.textContent = 'En espera';
+
+      // Show next scheduled time
+      if (status.next_scrape) {
+        activityDetail.textContent = `Proximo scrape: ${formatTime(status.next_scrape)}`;
+      } else {
+        activityDetail.textContent = 'Esperando...';
+      }
+
+      // Enable buttons
+      setButtonsDisabled(false);
+    }
+
+    // Update config inputs
+    (document.getElementById('config-scrape-interval') as HTMLInputElement).value = status.config.scrape_interval_minutes;
+    (document.getElementById('config-ai-interval') as HTMLInputElement).value = status.config.ai_process_interval_minutes;
+  }
+
+  function setButtonsDisabled(disabled: boolean) {
+    const buttons = document.querySelectorAll<HTMLButtonElement>('.action-btn');
+    buttons.forEach(btn => {
+      btn.disabled = disabled;
+      if (disabled) {
+        btn.classList.add('loading');
+      } else {
+        btn.classList.remove('loading');
+      }
+    });
+  }
+
+  async function updateStatus() {
+    try {
+      const response = await authFetch('/api/scraper/status');
+      if (!response.ok) throw new Error('Status fetch failed');
+      const status = await response.json();
+      updateUI(status);
+    } catch (error) {
+      console.error('Error updating status:', error);
+      document.getElementById('service-status')!.textContent = 'Sin conexion';
+      document.getElementById('service-status')!.className = 'status-badge error';
+    }
+  }
+
+  // Logs
+  function addLog(log: { timestamp: string; level: string; message: string }) {
+    const container = document.getElementById('logs-content')!;
+    const entry = document.createElement('div');
+    entry.style.cssText = 'display: flex; gap: 12px; padding: 2px 0;';
+
+    // Colors based on level
+    const level = log.level.toLowerCase();
+    const msgColor = level === 'error' ? '#ff6666' : level === 'warn' ? '#ffaa00' : '#ffcc00';
+
+    entry.innerHTML = `
+      <span style="color: #f9ff00; white-space: nowrap;">${log.timestamp}</span>
+      <span style="color: ${msgColor}; word-break: break-word;">${log.message}</span>
+    `;
+    container.appendChild(entry);
+
+    while (container.children.length > 200) {
+      container.removeChild(container.firstChild!);
+    }
+
+    container.scrollTop = container.scrollHeight;
+  }
+
+  function connectToLogStream() {
+    const indicator = document.getElementById('connection-indicator')!;
+
+    if (eventSource) eventSource.close();
+
+    indicator.className = 'connection-indicator connecting';
+    eventSource = new EventSource(`${API_BASE}/api/scraper/logs/stream`);
+
+    eventSource.onopen = () => {
+      indicator.className = 'connection-indicator connected';
+    };
+
+    eventSource.onmessage = (event) => {
+      try {
+        const log = JSON.parse(event.data);
+        if (!log.error) addLog(log);
+      } catch (e) {}
+    };
+
+    eventSource.onerror = () => {
+      indicator.className = 'connection-indicator error';
+      eventSource?.close();
+    };
+  }
+
+  // Actions
+  async function runNow() {
+    const selectedIds = getSelectedSourceIds();
+    if (selectedIds.length === 0) {
+      alert('Selecciona al menos una fuente');
+      return;
+    }
+
+    try {
+      setButtonsDisabled(true);
+      const body = selectedIds.length === sources.length ? {} : { source_ids: selectedIds };
+      await authFetch('/api/scraper/run-now', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+      // Start fast polling
+      startFastPolling();
+    } catch (error: any) {
+      setButtonsDisabled(false);
+      alert(`Error: ${error.message}`);
+    }
+  }
+
+  async function processAI() {
+    try {
+      setButtonsDisabled(true);
+      await authFetch('/api/scraper/process-ai', { method: 'POST' });
+      startFastPolling();
+    } catch (error: any) {
+      setButtonsDisabled(false);
+      alert(`Error: ${error.message}`);
+    }
+  }
+
+  async function saveConfig() {
+    const config = {
+      scrape_interval_minutes: parseInt((document.getElementById('config-scrape-interval') as HTMLInputElement).value),
+      ai_process_interval_minutes: parseInt((document.getElementById('config-ai-interval') as HTMLInputElement).value),
+    };
+
+    try {
+      await authFetch('/api/scraper/config', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(config)
+      });
+      alert('Configuracion guardada');
+    } catch (error: any) {
+      alert(`Error: ${error.message}`);
+    }
+  }
+
+  // Fast polling when waiting for task
+  let fastPollingInterval: number | null = null;
+
+  function startFastPolling() {
+    if (fastPollingInterval) clearInterval(fastPollingInterval);
+    fastPollingInterval = setInterval(updateStatus, 2000) as unknown as number;
+
+    // Stop after 2 minutes
+    setTimeout(() => {
+      if (fastPollingInterval) {
+        clearInterval(fastPollingInterval);
+        fastPollingInterval = null;
+      }
+    }, 120000);
+  }
+
+  // Init
+  document.addEventListener('DOMContentLoaded', () => {
+    loadSources();
+    updateStatus();
+    connectToLogStream();
+
+    // Normal polling every 10 seconds
+    statusInterval = setInterval(updateStatus, 10000) as unknown as number;
+
+    // Event listeners
+    document.getElementById('btn-run-now')?.addEventListener('click', runNow);
+    document.getElementById('btn-process-ai')?.addEventListener('click', processAI);
+    document.getElementById('btn-save-config')?.addEventListener('click', saveConfig);
+    document.getElementById('btn-select-all')?.addEventListener('click', selectAllSources);
+    document.getElementById('btn-select-none')?.addEventListener('click', selectNoSources);
+  });
+
+  window.addEventListener('beforeunload', () => {
+    if (eventSource) eventSource.close();
+    if (statusInterval) clearInterval(statusInterval);
+    if (fastPollingInterval) clearInterval(fastPollingInterval);
+  });
+</script>
+
+<style>
+  .container {
+    max-width: 900px;
+    margin: 0 auto;
+  }
+
+  .header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 24px;
+  }
+
+  .page-title {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin: 0;
+  }
+
+  .header-status {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .status-badge {
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    background: var(--bg-secondary);
+    color: var(--text-muted);
+  }
+
+  .status-badge.running {
+    background: rgba(34, 197, 94, 0.15);
+    color: #22c55e;
+  }
+
+  .status-badge.stopped {
+    background: rgba(239, 68, 68, 0.15);
+    color: #ef4444;
+  }
+
+  .status-badge.error {
+    background: rgba(239, 68, 68, 0.15);
+    color: #ef4444;
+  }
+
+  .uptime {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+  }
+
+  /* Activity Section */
+  .activity-section {
+    background: var(--bg-card);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg);
+    padding: 24px;
+    margin-bottom: 20px;
+  }
+
+  .activity-card {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    padding: 20px;
+    background: var(--bg-secondary);
+    border-radius: var(--radius-md);
+    margin-bottom: 24px;
+    transition: all 0.3s;
+  }
+
+  .activity-card.active {
+    background: rgba(59, 130, 246, 0.1);
+    border: 1px solid rgba(59, 130, 246, 0.3);
+  }
+
+  .activity-icon {
+    width: 64px;
+    height: 64px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--bg-card);
+    border-radius: 50%;
+    color: var(--text-muted);
+  }
+
+  .activity-card.active .activity-icon {
+    color: #3b82f6;
+  }
+
+  .spinner-large {
+    width: 32px;
+    height: 32px;
+    border: 3px solid currentColor;
+    border-radius: 50%;
+    border-top-color: transparent;
+    animation: spin 1s linear infinite;
+  }
+
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
+
+  .activity-content {
+    flex: 1;
+  }
+
+  .activity-title {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 4px;
+  }
+
+  .activity-detail {
+    font-size: 0.95rem;
+    color: var(--text-secondary);
+  }
+
+  /* Pipeline */
+  .pipeline {
+    display: flex;
+    align-items: center;
+    gap: 0;
+  }
+
+  .pipeline-step {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    background: var(--bg-secondary);
+    border-radius: var(--radius-md);
+  }
+
+  .pipeline-connector {
+    width: 24px;
+    height: 2px;
+    background: var(--border-subtle);
+  }
+
+  .step-indicator {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: var(--border-subtle);
+    flex-shrink: 0;
+  }
+
+  .pipeline-step[data-status="active"] {
+    background: rgba(59, 130, 246, 0.15);
+  }
+
+  .pipeline-step[data-status="active"] .step-indicator {
+    background: #3b82f6;
+    box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.2);
+    animation: pulse 1.5s ease-in-out infinite;
+  }
+
+  .pipeline-step[data-status="done"] .step-indicator {
+    background: #22c55e;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+  }
+
+  .step-title {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--text-primary);
+  }
+
+  .step-detail {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+  }
+
+  /* Actions */
+  .actions-section {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 20px;
+  }
+
+  .action-btn {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 16px 24px;
+    font-size: 1rem;
+    font-weight: 600;
+    border: none;
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .action-btn.primary {
+    background: #3b82f6;
+    color: white;
+  }
+
+  .action-btn.primary:hover:not(:disabled) {
+    background: #2563eb;
+  }
+
+  .action-btn.secondary {
+    background: var(--bg-card);
+    color: var(--text-primary);
+    border: 1px solid var(--border-subtle);
+  }
+
+  .action-btn.secondary:hover:not(:disabled) {
+    border-color: var(--border-medium);
+  }
+
+  .action-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+
+  .action-btn.loading {
+    position: relative;
+  }
+
+  .action-btn.loading::after {
+    content: '';
+    position: absolute;
+    width: 20px;
+    height: 20px;
+    border: 2px solid currentColor;
+    border-radius: 50%;
+    border-top-color: transparent;
+    animation: spin 0.8s linear infinite;
+  }
+
+  /* Stats Row */
+  .stats-row {
+    display: flex;
+    gap: 16px;
+    margin-bottom: 20px;
+  }
+
+  .stat-item {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 16px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+  }
+
+  .stat-value {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--text-primary);
+  }
+
+  .stat-label {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  /* Panels */
+  details {
+    background: var(--bg-card);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    margin-bottom: 12px;
+  }
+
+  summary {
+    padding: 16px;
+    font-weight: 600;
+    color: var(--text-primary);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  summary:hover {
+    color: var(--text-secondary);
+  }
+
+  details[open] summary {
+    border-bottom: 1px solid var(--border-subtle);
+  }
+
+  /* Sources */
+  .sources-list {
+    padding: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    max-height: 200px;
+    overflow-y: auto;
+  }
+
+  .source-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    background: var(--bg-secondary);
+    border-radius: var(--radius-sm);
+    font-size: 0.85rem;
+    cursor: pointer;
+  }
+
+  .source-item:hover {
+    background: var(--bg-card);
+  }
+
+  .sources-actions {
+    padding: 12px 16px;
+    border-top: 1px solid var(--border-subtle);
+    display: flex;
+    gap: 8px;
+  }
+
+  .btn-sm {
+    padding: 6px 12px;
+    font-size: 0.8rem;
+    font-weight: 500;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    color: var(--text-secondary);
+  }
+
+  .btn-sm:hover {
+    border-color: var(--border-medium);
+    color: var(--text-primary);
+  }
+
+  .btn-sm.primary {
+    background: #3b82f6;
+    color: white;
+    border: none;
+  }
+
+  /* Config */
+  .config-form {
+    padding: 16px;
+    display: flex;
+    align-items: flex-end;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+
+  .config-group {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .config-group label {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+  }
+
+  .config-group input {
+    width: 100px;
+    padding: 8px 12px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-sm);
+    color: var(--text-primary);
+    font-size: 0.95rem;
+  }
+
+  /* Logs */
+  .logs-content {
+    height: 300px;
+    overflow-y: auto;
+    padding: 12px 16px;
+    font-family: 'Monaco', 'Menlo', monospace;
+    font-size: 0.8rem;
+    line-height: 1.5;
+    background: #0d1117;
+  }
+
+  .log-entry {
+    display: flex;
+    gap: 12px;
+    padding: 2px 0;
+  }
+
+  .log-time {
+    color: #f9ff00;
+    white-space: nowrap;
+  }
+
+  .log-msg {
+    color: #ffcc00;
+    word-break: break-word;
+  }
+
+  .log-entry.log-warn .log-msg { color: #ffaa00; }
+  .log-entry.log-error .log-msg { color: #ff6666; }
+
+  .connection-indicator {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #6e7681;
+    margin-left: auto;
+  }
+
+  .connection-indicator.connecting {
+    background: #f0b429;
+    animation: pulse 1s infinite;
+  }
+
+  .connection-indicator.connected {
+    background: #22c55e;
+  }
+
+  .connection-indicator.error {
+    background: #f85149;
+  }
+
+  .loading-text, .no-sources {
+    color: var(--text-muted);
+    font-size: 0.85rem;
+  }
+
+  /* Responsive */
+  @media (max-width: 768px) {
+    .header {
+      flex-direction: column;
+      gap: 12px;
+      align-items: flex-start;
+    }
+
+    .actions-section {
+      flex-direction: column;
+    }
+
+    .pipeline {
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .pipeline-connector {
+      width: 2px;
+      height: 16px;
+    }
+
+    .stats-row {
+      flex-direction: column;
+    }
+
+    .config-form {
+      flex-direction: column;
+      align-items: stretch;
+    }
+
+    .config-group input {
+      width: 100%;
+    }
+  }
+</style>
