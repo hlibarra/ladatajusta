@@ -1,0 +1,559 @@
+---
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+---
+
+<AdminLayout title="Administrar Usuarios">
+  <div class="page-header">
+    <div>
+      <h1>Usuarios</h1>
+      <p class="subtitle">Gestiona los usuarios del sistema</p>
+    </div>
+    <button class="btn btn-primary" id="btn-new-user">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+        <path d="M12 5v14m-7-7h14"></path>
+      </svg>
+      Nuevo Usuario
+    </button>
+  </div>
+
+  <div class="card">
+    <div class="table-wrapper">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Email</th>
+            <th>Rol</th>
+            <th>Estado</th>
+            <th>Creado</th>
+            <th>Acciones</th>
+          </tr>
+        </thead>
+        <tbody id="users-table">
+          <tr>
+            <td colspan="5" class="loading-cell">Cargando usuarios...</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Modal for create/edit user -->
+  <div class="modal" id="user-modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 id="modal-title">Nuevo Usuario</h2>
+        <button class="modal-close" id="modal-close">&times;</button>
+      </div>
+      <div class="modal-body">
+        <form id="user-form">
+          <input type="hidden" id="user-id" />
+
+          <div class="form-group">
+            <label for="user-email">Email *</label>
+            <input type="email" id="user-email" class="form-input" required />
+          </div>
+
+          <div class="form-group">
+            <label for="user-password">Contrasena <span id="password-hint">(requerida)</span></label>
+            <input type="password" id="user-password" class="form-input" />
+            <small id="password-help">Minimo 6 caracteres</small>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label class="checkbox-label">
+                <input type="checkbox" id="user-admin" />
+                <span>Administrador</span>
+              </label>
+            </div>
+
+            <div class="form-group">
+              <label class="checkbox-label">
+                <input type="checkbox" id="user-active" checked />
+                <span>Activo</span>
+              </label>
+            </div>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" id="btn-cancel">Cancelar</button>
+        <button class="btn btn-primary" id="btn-save">Guardar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Confirm delete modal -->
+  <div class="modal" id="delete-modal">
+    <div class="modal-content modal-small">
+      <div class="modal-header">
+        <h2>Confirmar eliminacion</h2>
+        <button class="modal-close" id="delete-modal-close">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p>¿Estas seguro de que deseas eliminar al usuario <strong id="delete-user-email"></strong>?</p>
+        <p class="warning-text">Esta accion no se puede deshacer.</p>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" id="btn-cancel-delete">Cancelar</button>
+        <button class="btn btn-danger" id="btn-confirm-delete">Eliminar</button>
+      </div>
+    </div>
+  </div>
+</AdminLayout>
+
+<script>
+  import { authFetch } from '../../../lib/auth';
+
+  interface User {
+    id: string;
+    email: string;
+    is_active: boolean;
+    is_admin: boolean;
+    created_at: string;
+  }
+
+  let users: User[] = [];
+  let deleteUserId: string | null = null;
+
+  async function loadUsers() {
+    const tbody = document.getElementById('users-table')!;
+    tbody.innerHTML = '<tr><td colspan="5" class="loading-cell">Cargando usuarios...</td></tr>';
+
+    try {
+      const r = await authFetch('/api/users');
+      if (!r.ok) throw new Error('Failed to load');
+
+      const data = await r.json();
+      users = data.users || [];
+
+      if (users.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" class="empty-cell">No hay usuarios</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = users.map((user: User) => `
+        <tr>
+          <td>
+            <span class="user-email">${user.email}</span>
+          </td>
+          <td>
+            ${user.is_admin
+              ? '<span class="badge badge-info">Admin</span>'
+              : '<span class="badge badge-secondary">Usuario</span>'}
+          </td>
+          <td>
+            ${user.is_active
+              ? '<span class="badge badge-success">Activo</span>'
+              : '<span class="badge badge-error">Inactivo</span>'}
+          </td>
+          <td>
+            <span class="date">${formatDate(user.created_at)}</span>
+          </td>
+          <td>
+            <div class="action-buttons">
+              <button class="action-btn action-btn-edit" data-action="edit" data-id="${user.id}">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                  <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                  <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                </svg>
+                <span>Editar</span>
+              </button>
+              <button class="action-btn action-btn-delete" data-action="delete" data-id="${user.id}" data-email="${user.email}">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                  <polyline points="3 6 5 6 21 6"></polyline>
+                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                </svg>
+                <span>Eliminar</span>
+              </button>
+            </div>
+          </td>
+        </tr>
+      `).join('');
+
+      setupUserActions();
+    } catch (e) {
+      console.error('Error:', e);
+      tbody.innerHTML = '<tr><td colspan="5" class="error-cell">Error al cargar usuarios</td></tr>';
+    }
+  }
+
+  function formatDate(dateStr: string): string {
+    const date = new Date(dateStr);
+    return date.toLocaleDateString('es-AR', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+    });
+  }
+
+  function setupUserActions() {
+    document.querySelectorAll('[data-action]').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const target = e.currentTarget as HTMLButtonElement;
+        const action = target.dataset.action;
+        const id = target.dataset.id;
+
+        if (action === 'edit') {
+          openEditModal(id!);
+        } else if (action === 'delete') {
+          const email = target.dataset.email;
+          openDeleteModal(id!, email!);
+        }
+      });
+    });
+  }
+
+  function openEditModal(userId: string) {
+    const user = users.find(u => u.id === userId);
+    if (!user) return;
+
+    document.getElementById('modal-title')!.textContent = 'Editar Usuario';
+    (document.getElementById('user-id') as HTMLInputElement).value = userId;
+    (document.getElementById('user-email') as HTMLInputElement).value = user.email;
+    (document.getElementById('user-password') as HTMLInputElement).value = '';
+    (document.getElementById('user-admin') as HTMLInputElement).checked = user.is_admin;
+    (document.getElementById('user-active') as HTMLInputElement).checked = user.is_active;
+
+    document.getElementById('password-hint')!.textContent = '(dejar vacio para mantener)';
+    document.getElementById('password-help')!.textContent = 'Dejar vacio para no cambiar la contrasena';
+
+    document.getElementById('user-modal')!.classList.add('show');
+  }
+
+  function openNewModal() {
+    document.getElementById('modal-title')!.textContent = 'Nuevo Usuario';
+    (document.getElementById('user-form') as HTMLFormElement).reset();
+    (document.getElementById('user-id') as HTMLInputElement).value = '';
+    (document.getElementById('user-active') as HTMLInputElement).checked = true;
+
+    document.getElementById('password-hint')!.textContent = '(requerida)';
+    document.getElementById('password-help')!.textContent = 'Minimo 6 caracteres';
+
+    document.getElementById('user-modal')!.classList.add('show');
+  }
+
+  function openDeleteModal(userId: string, email: string) {
+    deleteUserId = userId;
+    document.getElementById('delete-user-email')!.textContent = email;
+    document.getElementById('delete-modal')!.classList.add('show');
+  }
+
+  async function saveUser() {
+    const id = (document.getElementById('user-id') as HTMLInputElement).value;
+    const email = (document.getElementById('user-email') as HTMLInputElement).value.trim();
+    const password = (document.getElementById('user-password') as HTMLInputElement).value;
+    const isAdmin = (document.getElementById('user-admin') as HTMLInputElement).checked;
+    const isActive = (document.getElementById('user-active') as HTMLInputElement).checked;
+
+    if (!email) {
+      alert('El email es requerido');
+      return;
+    }
+
+    // Validate password for new users
+    if (!id && (!password || password.length < 6)) {
+      alert('La contrasena debe tener al menos 6 caracteres');
+      return;
+    }
+
+    // Validate password if provided for existing users
+    if (id && password && password.length < 6) {
+      alert('La contrasena debe tener al menos 6 caracteres');
+      return;
+    }
+
+    const data: any = {
+      email,
+      is_admin: isAdmin,
+      is_active: isActive,
+    };
+
+    if (password) {
+      data.password = password;
+    }
+
+    try {
+      let r;
+      if (id) {
+        // Update
+        r = await authFetch(`/api/users/${id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data),
+        });
+      } else {
+        // Create - password is required
+        data.password = password;
+        r = await authFetch('/api/users', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data),
+        });
+      }
+
+      if (!r.ok) {
+        const error = await r.json();
+        throw new Error(error.detail || 'Error al guardar');
+      }
+
+      closeModal();
+      loadUsers();
+    } catch (e: any) {
+      console.error('Error:', e);
+      alert(e.message || 'Error al guardar usuario');
+    }
+  }
+
+  async function deleteUser() {
+    if (!deleteUserId) return;
+
+    try {
+      const r = await authFetch(`/api/users/${deleteUserId}`, {
+        method: 'DELETE',
+      });
+
+      if (!r.ok) {
+        const error = await r.json();
+        throw new Error(error.detail || 'Error al eliminar');
+      }
+
+      closeDeleteModal();
+      loadUsers();
+    } catch (e: any) {
+      console.error('Error:', e);
+      alert(e.message || 'Error al eliminar usuario');
+    }
+  }
+
+  function closeModal() {
+    document.getElementById('user-modal')!.classList.remove('show');
+  }
+
+  function closeDeleteModal() {
+    document.getElementById('delete-modal')!.classList.remove('show');
+    deleteUserId = null;
+  }
+
+  // Event listeners
+  document.getElementById('btn-new-user')?.addEventListener('click', openNewModal);
+  document.getElementById('btn-save')?.addEventListener('click', saveUser);
+  document.getElementById('btn-cancel')?.addEventListener('click', closeModal);
+  document.getElementById('modal-close')?.addEventListener('click', closeModal);
+  document.getElementById('delete-modal-close')?.addEventListener('click', closeDeleteModal);
+  document.getElementById('btn-cancel-delete')?.addEventListener('click', closeDeleteModal);
+  document.getElementById('btn-confirm-delete')?.addEventListener('click', deleteUser);
+
+  // Close modal on outside click
+  window.addEventListener('click', (e) => {
+    if ((e.target as HTMLElement).classList.contains('modal')) {
+      closeModal();
+      closeDeleteModal();
+    }
+  });
+
+  // Initial load
+  document.addEventListener('DOMContentLoaded', () => {
+    loadUsers();
+  });
+</script>
+
+<style>
+  .page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 24px;
+  }
+
+  .subtitle {
+    color: var(--text-secondary);
+    margin: 4px 0 0;
+  }
+
+  .table-wrapper {
+    overflow-x: auto;
+  }
+
+  .user-email {
+    font-weight: 500;
+  }
+
+  .date {
+    color: var(--text-muted);
+    font-size: 0.9rem;
+  }
+
+  .badge-secondary {
+    background: rgba(107, 114, 128, 0.15);
+    color: var(--text-secondary);
+  }
+
+  /* Modal */
+  .modal {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.7);
+    z-index: 1000;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .modal.show {
+    display: flex;
+  }
+
+  .modal-content {
+    background: var(--bg-card);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg);
+    width: 90%;
+    max-width: 500px;
+    max-height: 90vh;
+    overflow-y: auto;
+  }
+
+  .modal-small {
+    max-width: 400px;
+  }
+
+  .modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px 24px;
+    border-bottom: 1px solid var(--border-subtle);
+  }
+
+  .modal-header h2 {
+    margin: 0;
+    font-size: 1.25rem;
+  }
+
+  .modal-close {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    font-size: 2rem;
+    cursor: pointer;
+    padding: 0;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--radius-sm);
+    transition: all 0.2s ease;
+  }
+
+  .modal-close:hover {
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+  }
+
+  .modal-body {
+    padding: 24px;
+  }
+
+  .modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+    padding: 20px 24px;
+    border-top: 1px solid var(--border-subtle);
+  }
+
+  .form-group {
+    margin-bottom: 20px;
+  }
+
+  .form-group label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+  }
+
+  .form-group small {
+    display: block;
+    margin-top: 6px;
+    color: var(--text-muted);
+    font-size: 0.85rem;
+  }
+
+  .form-input {
+    width: 100%;
+    padding: 10px 14px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-sm);
+    color: var(--text-primary);
+    font-size: 0.95rem;
+    transition: all 0.2s ease;
+  }
+
+  .form-input:focus {
+    outline: none;
+    border-color: var(--accent-secondary);
+    background: var(--bg-primary);
+  }
+
+  .form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+
+  .checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    padding: 10px 0;
+  }
+
+  .checkbox-label input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    cursor: pointer;
+  }
+
+  .warning-text {
+    color: var(--error);
+    font-size: 0.9rem;
+    margin-top: 8px;
+  }
+
+  .loading-cell,
+  .empty-cell,
+  .error-cell {
+    text-align: center;
+    padding: 40px 20px;
+    color: var(--text-muted);
+  }
+
+  .error-cell {
+    color: var(--error);
+  }
+
+  @media (max-width: 768px) {
+    .page-header {
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .form-row {
+      grid-template-columns: 1fr;
+    }
+
+    .modal-content {
+      width: 95%;
+      max-height: 95vh;
+    }
+  }
+</style>

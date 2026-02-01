@@ -29,7 +29,7 @@ const activeSections = sections.filter(s => s.is_active).slice(0, 6);
 ---
 
 <!doctype html>
-<html lang="es" data-theme="dark">
+<html lang="es" data-theme="light">
 	<head>
 		<meta charset="UTF-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -51,7 +51,7 @@ const activeSections = sections.filter(s => s.is_active).slice(0, 6);
 		<script is:inline async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-XXXXXXXXXX" crossorigin="anonymous"></script>
 
 		<script is:inline>
-			const theme = localStorage.getItem('theme') || 'dark';
+			const theme = localStorage.getItem('theme') || 'light';
 			document.documentElement.setAttribute('data-theme', theme);
 		</script>
 	</head>
@@ -116,7 +116,12 @@ const activeSections = sections.filter(s => s.is_active).slice(0, 6);
 						<div class="footer-content">
 							<div class="footer-brand">La Data Justa</div>
 							<p class="footer-tagline">Este sitio se actualiza automáticamente, las 24 horas, leyendo y procesando información pública con inteligencia artificial.</p>
-							<p class="footer-copy">{new Date().getFullYear()} La Data Justa</p>
+							<div class="footer-links">
+								<a href="/about">Sobre nosotros</a>
+								<span class="footer-separator">·</span>
+								<a href="/">Inicio</a>
+							</div>
+							<p class="footer-copy">&copy; {new Date().getFullYear()} La Data Justa</p>
 						</div>
 					</footer>
 				</div>
@@ -140,7 +145,7 @@ const activeSections = sections.filter(s => s.is_active).slice(0, 6);
 		if (toggle) {
 			toggle.addEventListener('click', function() {
 				var html = document.documentElement;
-				var current = html.getAttribute('data-theme') || 'dark';
+				var current = html.getAttribute('data-theme') || 'light';
 				var next = current === 'dark' ? 'light' : 'dark';
 				html.setAttribute('data-theme', next);
 				localStorage.setItem('theme', next);
@@ -564,7 +569,11 @@ const activeSections = sections.filter(s => s.is_active).slice(0, 6);
 	.footer { background: var(--bg-secondary); border-top: 1px solid var(--border-subtle); transition: background-color 0.3s; }
 	.footer-content { width: 100%; padding: 40px 24px; text-align: center; }
 	.footer-brand { font-weight: 700; font-size: 1.1rem; margin-bottom: 8px; color: var(--text-primary); }
-	.footer-tagline { color: var(--text-secondary); margin: 0 0 12px; max-width: 500px; margin-left: auto; margin-right: auto; }
+	.footer-tagline { color: var(--text-secondary); margin: 0 0 16px; max-width: 500px; margin-left: auto; margin-right: auto; }
+	.footer-links { display: flex; justify-content: center; gap: 8px; margin-bottom: 16px; }
+	.footer-links a { color: var(--text-secondary); text-decoration: none; font-size: 0.9rem; transition: color 0.2s ease; }
+	.footer-links a:hover { color: var(--accent-primary); }
+	.footer-separator { color: var(--text-muted); }
 	.footer-copy { color: var(--text-muted); font-size: 0.85rem; margin: 0; }
 
 	/* AdSense Containers */

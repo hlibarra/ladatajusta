@@ -36,7 +36,6 @@ RUN pip install playwright && playwright install chromium
 
 COPY app ./app
 COPY scripts ./scripts
-COPY scraping ./scraping
 
 EXPOSE 8000
 
