@@ -27,11 +27,35 @@ services:
       CORS_ORIGINS: ${CORS_ORIGINS}
       OPENAI_API_KEY: ${OPENAI_API_KEY}
       JWT_SECRET: ${JWT_SECRET}
+      SCRAPER_CONTROL_URL: http://scraper:8080
     depends_on:
       db:
         condition: service_healthy
+      scraper:
+        condition: service_started
     ports:
       - "127.0.0.1:8000:8000"
+
+  scraper:
+    build:
+      context: ./scraping
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_NAME: ${POSTGRES_DB:-ladatajusta}
+      DB_USER: ${POSTGRES_USER:-ladatajusta}
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o-mini}
+      SCRAPE_INTERVAL_MINUTES: ${SCRAPE_INTERVAL_MINUTES:-60}
+      AI_PROCESS_INTERVAL_MINUTES: ${AI_PROCESS_INTERVAL_MINUTES:-30}
+      PREPARE_HOURS_AGO: ${PREPARE_HOURS_AGO:-24}
+      CONTROL_SERVER_PORT: 8080
+    depends_on:
+      db:
+        condition: service_healthy
 
   frontend:
     build:
