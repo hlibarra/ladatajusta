@@ -13,7 +13,7 @@ type Publication = {
 	published_at?: string | null;
 };
 
-const API_BASE = import.meta.env.PUBLIC_API_BASE_URL ?? 'http://localhost:8000';
+const API_BASE = import.meta.env.PUBLIC_API_BASE_URL || 'http://backend:8000';
 let pubs: Publication[] = [];
 let error = false;
 

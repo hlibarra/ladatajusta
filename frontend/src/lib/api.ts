@@ -1,7 +1,7 @@
 // Use internal URL for SSR, external URL for browser
 export const API_BASE = import.meta.env.SSR
-  ? (import.meta.env.PUBLIC_API_BASE_URL ?? "http://localhost:8000")
-  : (import.meta.env.PUBLIC_CLIENT_API_BASE_URL ?? import.meta.env.PUBLIC_API_BASE_URL ?? "http://localhost:8000");
+  ? (import.meta.env.PUBLIC_API_BASE_URL || "http://backend:8000")
+  : (import.meta.env.PUBLIC_CLIENT_API_BASE_URL || import.meta.env.PUBLIC_API_BASE_URL || "");
 
 // Types
 export interface Publication {

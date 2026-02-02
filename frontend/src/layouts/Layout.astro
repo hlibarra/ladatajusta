@@ -4,7 +4,8 @@ interface Props {
 }
 const { title = 'La Data Justa' } = Astro.props;
 
-const API_BASE = import.meta.env.PUBLIC_API_BASE_URL ?? 'http://localhost:8000';
+// In SSR (this file), always use internal HTTP URL
+const API_BASE = import.meta.env.PUBLIC_API_BASE_URL || 'http://backend:8000';
 
 interface Section {
 	id: number;
