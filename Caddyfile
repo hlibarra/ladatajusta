@@ -1,0 +1,11 @@
+ladatajusta.com.ar, www.ladatajusta.com.ar {
+    # API - rutas que empiezan con /api
+    handle /api/* {
+        reverse_proxy backend:8000
+    }
+
+    # Frontend - todas las demas rutas
+    handle {
+        reverse_proxy frontend:4321
+    }
+}
