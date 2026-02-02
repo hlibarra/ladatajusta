@@ -6,9 +6,11 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm ci
 
-# Build argument for API URL
+# Build arguments for API URLs
 ARG PUBLIC_API_BASE_URL
+ARG PUBLIC_CLIENT_API_BASE_URL
 ENV PUBLIC_API_BASE_URL=${PUBLIC_API_BASE_URL}
+ENV PUBLIC_CLIENT_API_BASE_URL=${PUBLIC_CLIENT_API_BASE_URL}
 
 # Copy source and build
 COPY . .
