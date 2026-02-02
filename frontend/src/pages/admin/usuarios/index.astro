@@ -240,14 +240,20 @@ import AdminLayout from '../../../layouts/AdminLayout.astro';
   }
 
   async function saveUser() {
-    const idInput = document.getElementById('user-id') as HTMLInputElement | null;
-    const emailInput = document.getElementById('user-email') as HTMLInputElement | null;
-    const passwordInput = document.getElementById('user-password') as HTMLInputElement | null;
-    const adminInput = document.getElementById('user-admin') as HTMLInputElement | null;
-    const activeInput = document.getElementById('user-active') as HTMLInputElement | null;
+    // Get elements from the modal
+    const modal = document.getElementById('user-modal');
+    const idInput = modal?.querySelector('#user-id') as HTMLInputElement | null;
+    const emailInput = modal?.querySelector('#user-email') as HTMLInputElement | null;
+    const passwordInput = modal?.querySelector('#user-password') as HTMLInputElement | null;
+    const adminInput = modal?.querySelector('#user-admin') as HTMLInputElement | null;
+    const activeInput = modal?.querySelector('#user-active') as HTMLInputElement | null;
+
+    console.log('Modal found:', !!modal);
+    console.log('Email input found:', !!emailInput);
+    console.log('Email input value:', emailInput?.value);
 
     if (!emailInput || !passwordInput || !adminInput || !activeInput) {
-      console.error('Form elements not found');
+      console.error('Form elements not found', { emailInput, passwordInput, adminInput, activeInput });
       alert('Error: No se encontraron los elementos del formulario');
       return;
     }
@@ -257,6 +263,8 @@ import AdminLayout from '../../../layouts/AdminLayout.astro';
     const password = passwordInput.value || '';
     const isAdmin = adminInput.checked;
     const isActive = activeInput.checked;
+
+    console.log('Values:', { id, email, password: password.length, isAdmin, isActive });
 
     if (!email) {
       alert('El email es requerido');
