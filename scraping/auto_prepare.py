@@ -25,8 +25,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 # Load environment variables
-env_path = Path(__file__).parent / "lagaceta" / ".env"
-load_dotenv(dotenv_path=env_path)
+load_dotenv()
 
 # Database connection
 DB_CONFIG = {

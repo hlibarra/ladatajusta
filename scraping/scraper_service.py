@@ -23,8 +23,9 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 # Load environment variables
-env_path = Path(__file__).parent / "lagaceta" / ".env"
-load_dotenv(dotenv_path=env_path)
+# In Docker: uses env vars from docker-compose
+# Locally: searches for .env in parent directories
+load_dotenv()
 
 # Reconfigure stdout for Docker logs
 if sys.platform == "win32":
@@ -356,13 +357,113 @@ async def auto_prepare():
         controller.current_task = None
 
 
-def update_next_times(last_scrape: datetime, last_ai: datetime):
+async def auto_publish():
+    """Auto-publish items from sources with auto_publish enabled after delay period"""
+    log("Starting auto-publish")
+    controller.current_task = "Auto-Publish"
+
+    # Import and run auto_publish module
+    auto_publish_file = Path(__file__).parent / "auto_publish.py"
+
+    if not auto_publish_file.exists():
+        log("auto_publish.py not found, skipping auto-publish", "WARN")
+        controller.current_task = None
+        return
+
+    try:
+        spec = importlib.util.spec_from_file_location("auto_publish", auto_publish_file)
+        if spec and spec.loader:
+            auto_publish_module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(auto_publish_module)
+
+            if hasattr(auto_publish_module, 'main'):
+                stats = await auto_publish_module.main()
+                if stats:
+                    published = stats.get("published", 0)
+                    if published > 0:
+                        controller.items_processed["auto_published"] = controller.items_processed.get("auto_published", 0) + published
+                        log(f"Auto-publish: {published} publicados automáticamente")
+            else:
+                log("auto_publish.py has no main() function", "WARN")
+
+    except Exception as e:
+        log(f"Auto-publish error: {e}", "ERROR")
+    finally:
+        controller.current_task = None
+
+
+async def curate_news(dry_run: bool = False):
+    """Curate and publish news using intelligent selection algorithm"""
+    mode = "simulación" if dry_run else "publicación"
+    log(f"Starting news curation ({mode})")
+    controller.current_task = "Curación de noticias"
+
+    # Import and run news_curator module
+    curator_file = Path(__file__).parent / "news_curator.py"
+
+    if not curator_file.exists():
+        log("news_curator.py not found, skipping curation", "WARN")
+        controller.current_task = None
+        return None
+
+    try:
+        import asyncpg
+        # Create pool for curator
+        pool = await asyncpg.create_pool(**DB_CONFIG)
+
+        try:
+            spec = importlib.util.spec_from_file_location("news_curator", curator_file)
+            if spec and spec.loader:
+                curator_module = importlib.util.module_from_spec(spec)
+                spec.loader.exec_module(curator_module)
+
+                if hasattr(curator_module, 'curate_and_publish'):
+                    # Get config from controller
+                    target_count = controller.config.get("curator_target_count", 12)
+                    max_per_category = controller.config.get("curator_max_per_category", 3)
+                    max_per_source = controller.config.get("curator_max_per_source", 3)
+
+                    stats = await curator_module.curate_and_publish(
+                        pool,
+                        target_count=target_count,
+                        max_per_category=max_per_category,
+                        max_per_source=max_per_source,
+                        dry_run=dry_run,
+                        log_func=log
+                    )
+
+                    if stats:
+                        if not dry_run and stats.get("published_count", 0) > 0:
+                            controller.items_processed["curated"] += stats.get("published_count", 0)
+                        log(f"Curation complete: {stats.get('total_available', 0)} disponibles, {stats.get('selected_count', 0)} seleccionados, {stats.get('published_count', 0)} publicados")
+                        return stats
+                else:
+                    log("news_curator.py has no curate_and_publish() function", "WARN")
+        finally:
+            await pool.close()
+
+    except Exception as e:
+        log(f"Curation error: {e}", "ERROR")
+    finally:
+        controller.current_task = None
+
+    return None
+
+
+def update_next_times(last_scrape: datetime, last_ai: datetime, last_curate: datetime = None):
     """Update next scheduled times in controller"""
     scrape_interval = controller.config["scrape_interval_minutes"]
     ai_interval = controller.config["ai_process_interval_minutes"]
+    curator_interval = controller.config.get("curator_interval_minutes", 120)
+    curator_enabled = controller.config.get("curator_enabled", False)
 
     controller.next_scrape_time = last_scrape + timedelta(minutes=scrape_interval)
     controller.next_ai_time = last_ai + timedelta(minutes=ai_interval)
+
+    if curator_enabled and last_curate:
+        controller.next_curate_time = last_curate + timedelta(minutes=curator_interval)
+    else:
+        controller.next_curate_time = None
 
 
 async def main():
@@ -395,6 +496,7 @@ async def main():
 
     last_scrape = datetime.min
     last_ai_process = datetime.min
+    last_curate = datetime.min
 
     while not shutdown_requested and not controller.stop_requested:
         now = datetime.now()
@@ -414,6 +516,7 @@ async def main():
                 await prepare_for_ai()
                 await process_ai()
                 await auto_prepare()
+                await auto_publish()  # Auto-publish after auto-prepare
                 last_scrape = datetime.now()
                 last_ai_process = datetime.now()
                 controller.last_scrape_time = last_scrape
@@ -430,13 +533,14 @@ async def main():
             last_ai_process = datetime.min
             continue
 
-        # Check for process-ai request (AI processing + auto-prepare)
+        # Check for process-ai request (AI processing + auto-prepare + auto-publish)
         if controller.process_ai_requested:
             controller.process_ai_requested = False
             log("Running AI processing (manual trigger)...")
             try:
                 await process_ai()
                 await auto_prepare()  # Auto-prepare after AI processing
+                await auto_publish()  # Auto-publish after auto-prepare
                 last_ai_process = datetime.now()
                 controller.last_ai_time = last_ai_process
             except Exception as e:
@@ -449,8 +553,34 @@ async def main():
             log("Running auto-prepare (manual trigger)...")
             try:
                 await auto_prepare()
+                await auto_publish()  # Auto-publish after auto-prepare
             except Exception as e:
                 log(f"Auto-prepare error: {e}", "ERROR")
+            continue
+
+        # Check for auto-publish request
+        if controller.auto_publish_requested:
+            controller.auto_publish_requested = False
+            log("Running auto-publish (manual trigger)...")
+            try:
+                await auto_publish()
+            except Exception as e:
+                log(f"Auto-publish error: {e}", "ERROR")
+            continue
+
+        # Check for curator request
+        if controller.curate_now_requested:
+            controller.curate_now_requested = False
+            dry_run = controller.curate_dry_run
+            controller.curate_dry_run = False
+            log(f"Running news curation (manual trigger, dry_run={dry_run})...")
+            try:
+                await curate_news(dry_run=dry_run)
+                if not dry_run:
+                    last_curate = datetime.now()
+                    controller.last_curate_time = last_curate
+            except Exception as e:
+                log(f"Curation error: {e}", "ERROR")
             continue
 
         # Check if it's time to scrape
@@ -473,13 +603,28 @@ async def main():
                 await process_ai()
                 # Auto-prepare after AI processing
                 await auto_prepare()
+                # Auto-publish after auto-prepare
+                await auto_publish()
                 last_ai_process = datetime.now()
                 controller.last_ai_time = last_ai_process
             except Exception as e:
                 log(f"AI processing error: {e}", "ERROR")
 
+        # Check if it's time to run curator (if enabled)
+        curator_enabled = controller.config.get("curator_enabled", False)
+        curator_interval = controller.config.get("curator_interval_minutes", 120)
+        if curator_enabled:
+            minutes_since_curate = (now - last_curate).total_seconds() / 60
+            if minutes_since_curate >= curator_interval:
+                try:
+                    await curate_news(dry_run=False)
+                    last_curate = datetime.now()
+                    controller.last_curate_time = last_curate
+                except Exception as e:
+                    log(f"Scheduled curation error: {e}", "ERROR")
+
         # Update next scheduled times
-        update_next_times(last_scrape, last_ai_process)
+        update_next_times(last_scrape, last_ai_process, last_curate)
 
         # Sleep for 1 minute between checks
         if not shutdown_requested and not controller.stop_requested:

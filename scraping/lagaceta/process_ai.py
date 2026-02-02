@@ -18,9 +18,10 @@ from pathlib import Path
 from dotenv import load_dotenv
 from openai import AsyncOpenAI
 
-# Load environment variables from .env file
-env_path = Path(__file__).parent / ".env"
-load_dotenv(dotenv_path=env_path)
+# Load environment variables
+# In Docker: uses env vars passed by docker-compose
+# Locally: searches for .env in parent directories (finds root .env)
+load_dotenv()
 
 # Reconfigure stdout for Windows emoji support
 if sys.platform == "win32":

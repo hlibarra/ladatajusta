@@ -28,11 +28,13 @@ class ScraperController:
         self.status = "starting"  # starting, running, paused, stopped
         self.last_scrape_time = None
         self.last_ai_time = None
+        self.last_curate_time = None
         self.next_scrape_time = None
         self.next_ai_time = None
+        self.next_curate_time = None
         self.current_task = None  # What's running now
         self.current_source = None  # Current source being scraped
-        self.items_processed = {"scraped": 0, "ai_processed": 0, "prepared": 0}
+        self.items_processed = {"scraped": 0, "ai_processed": 0, "prepared": 0, "curated": 0}
 
         # Configuration (synced with env vars)
         self.config = {
@@ -40,6 +42,12 @@ class ScraperController:
             "ai_process_interval_minutes": 30,
             "prepare_hours_ago": 24,
             "selected_source_ids": None,  # None = all active sources
+            # Curator configuration
+            "curator_enabled": False,  # Auto-run curator on interval
+            "curator_interval_minutes": 120,  # How often to run curator
+            "curator_target_count": 12,  # How many items to publish
+            "curator_max_per_category": 3,
+            "curator_max_per_source": 3,
         }
 
         # Log buffer (last 1000 lines)
@@ -53,6 +61,9 @@ class ScraperController:
         self.run_source_ids = None  # List of source IDs to scrape (None = all active)
         self.process_ai_requested = False
         self.auto_prepare_requested = False
+        self.auto_publish_requested = False
+        self.curate_now_requested = False
+        self.curate_dry_run = False  # If true, only simulate curation
 
         # Start time
         self.start_time = datetime.now()
@@ -84,8 +95,10 @@ class ScraperController:
             "current_source": self.current_source,
             "last_scrape": self.last_scrape_time.isoformat() if self.last_scrape_time else None,
             "last_ai_process": self.last_ai_time.isoformat() if self.last_ai_time else None,
+            "last_curate": self.last_curate_time.isoformat() if self.last_curate_time else None,
             "next_scrape": self.next_scrape_time.isoformat() if self.next_scrape_time else None,
             "next_ai_process": self.next_ai_time.isoformat() if self.next_ai_time else None,
+            "next_curate": self.next_curate_time.isoformat() if self.next_curate_time else None,
             "items_processed": self.items_processed,
             "config": self.config,
         }
@@ -123,6 +136,18 @@ class ScraperController:
         """Request auto-prepare only"""
         self.auto_prepare_requested = True
         self.add_log("Auto-prepare requested via API", "INFO")
+
+    def request_auto_publish(self):
+        """Request auto-publish only"""
+        self.auto_publish_requested = True
+        self.add_log("Auto-publish requested via API", "INFO")
+
+    def request_curate(self, dry_run: bool = False):
+        """Request news curation (intelligent selection and publish)"""
+        self.curate_now_requested = True
+        self.curate_dry_run = dry_run
+        mode = "dry run" if dry_run else "publish"
+        self.add_log(f"News curation requested ({mode})", "INFO")
 
     def update_config(self, new_config: dict):
         """Update configuration"""
@@ -236,6 +261,26 @@ async def handle_auto_prepare(request):
     return web.json_response({"success": True, "message": "Auto-prepare requested"})
 
 
+async def handle_auto_publish(request):
+    """POST /auto-publish - Run auto-publish only"""
+    controller.request_auto_publish()
+    return web.json_response({"success": True, "message": "Auto-publish requested"})
+
+
+async def handle_curate(request):
+    """POST /curate - Run news curation (select and publish best items)"""
+    dry_run = False
+    try:
+        data = await request.json()
+        dry_run = data.get('dry_run', False)
+    except Exception:
+        pass  # No JSON body, use defaults
+
+    controller.request_curate(dry_run=dry_run)
+    mode = "simulación" if dry_run else "publicación"
+    return web.json_response({"success": True, "message": f"Curación de noticias solicitada ({mode})"})
+
+
 async def handle_get_config(request):
     """GET /config - Get current configuration"""
     return web.json_response(controller.config)
@@ -283,6 +328,8 @@ def create_app() -> web.Application:
     app.router.add_post('/run-now', handle_run_now)
     app.router.add_post('/process-ai', handle_process_ai)
     app.router.add_post('/auto-prepare', handle_auto_prepare)
+    app.router.add_post('/auto-publish', handle_auto_publish)
+    app.router.add_post('/curate', handle_curate)
     app.router.add_get('/config', handle_get_config)
     app.router.add_put('/config', handle_put_config)
     app.router.add_options('/{path:.*}', handle_cors_preflight)

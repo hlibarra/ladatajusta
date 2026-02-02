@@ -162,6 +162,25 @@ async def auto_prepare_now():
     return await proxy_post("/auto-prepare")
 
 
+@router.post("/auto-publish")
+async def auto_publish_now():
+    """Trigger auto-publish only (publish items from sources with auto_publish enabled)"""
+    return await proxy_post("/auto-publish")
+
+
+class CurateRequest(BaseModel):
+    dry_run: bool = False
+
+
+@router.post("/curate")
+async def curate_news(request: CurateRequest = Body(default=None)):
+    """Trigger news curation (intelligent selection and publish)"""
+    data = None
+    if request:
+        data = {"dry_run": request.dry_run}
+    return await proxy_post("/curate", data)
+
+
 @router.get("/config")
 async def get_scraper_config():
     """Get current scraper configuration"""

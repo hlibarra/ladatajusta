@@ -242,6 +242,10 @@ class ScrapingSource(Base):
     # AI processing configuration
     ai_prompt: Mapped[str | None] = mapped_column(Text, nullable=True)
 
+    # Auto-publish configuration
+    auto_publish: Mapped[bool] = mapped_column(default=False, index=True)
+    auto_publish_delay_minutes: Mapped[int] = mapped_column(Integer, default=15)
+
     # Status tracking
     last_scraped_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
     last_scrape_status: Mapped[str | None] = mapped_column(String(32), nullable=True)

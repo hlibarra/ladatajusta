@@ -33,6 +33,8 @@ class ScrapingSourceBase(BaseModel):
     scraper_script_path: Optional[str] = None
     scraper_config: Optional[dict] = None
     ai_prompt: Optional[str] = None
+    auto_publish: bool = False
+    auto_publish_delay_minutes: int = 15
     notes: Optional[str] = None
 
 
@@ -51,6 +53,8 @@ class ScrapingSourceUpdate(BaseModel):
     scraper_script_path: Optional[str] = None
     scraper_config: Optional[dict] = None
     ai_prompt: Optional[str] = None
+    auto_publish: Optional[bool] = None
+    auto_publish_delay_minutes: Optional[int] = None
     max_consecutive_errors: Optional[int] = None
     notes: Optional[str] = None
 
@@ -69,6 +73,8 @@ class ScrapingSourceResponse(BaseModel):
     scraper_script_path: Optional[str]
     scraper_config: Optional[dict]
     ai_prompt: Optional[str]
+    auto_publish: bool
+    auto_publish_delay_minutes: int
     last_scraped_at: Optional[datetime]
     last_scrape_status: Optional[str]
     last_scrape_message: Optional[str]

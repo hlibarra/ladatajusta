@@ -57,6 +57,14 @@ import AdminLayout from '../../../layouts/AdminLayout.astro';
             <div class="step-detail" id="step-prepare-detail">-</div>
           </div>
         </div>
+        <div class="pipeline-connector"></div>
+        <div class="pipeline-step" id="step-curate" data-status="idle">
+          <div class="step-indicator"></div>
+          <div class="step-content">
+            <div class="step-title">Curador</div>
+            <div class="step-detail" id="step-curate-detail">-</div>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -76,6 +84,40 @@ import AdminLayout from '../../../layouts/AdminLayout.astro';
       </button>
     </div>
 
+    <!-- Curator Section -->
+    <div class="curator-section">
+      <div class="curator-header">
+        <h3>Curador de Noticias</h3>
+        <span class="curator-description">Selecciona y publica las mejores noticias automaticamente</span>
+      </div>
+      <div class="curator-actions">
+        <button id="btn-curate-preview" class="action-btn secondary curator-btn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
+            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+            <circle cx="12" cy="12" r="3"/>
+          </svg>
+          <span>Vista Previa</span>
+        </button>
+        <button id="btn-curate-now" class="action-btn primary curator-btn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
+            <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+            <path d="M2 17l10 5 10-5"/>
+            <path d="M2 12l10 5 10-5"/>
+          </svg>
+          <span>Curar y Publicar</span>
+        </button>
+      </div>
+      <div id="curator-status" class="curator-status" style="display: none;">
+        <div class="curator-info">
+          <span id="curator-available">0</span> disponibles
+          <span class="separator">|</span>
+          <span id="curator-selected">0</span> seleccionados
+          <span class="separator">|</span>
+          <span id="curator-published">0</span> publicados
+        </div>
+      </div>
+    </div>
+
     <!-- Stats Row -->
     <div class="stats-row">
       <div class="stat-item">
@@ -89,6 +131,10 @@ import AdminLayout from '../../../layouts/AdminLayout.astro';
       <div class="stat-item">
         <span class="stat-value" id="items-prepared">0</span>
         <span class="stat-label">Preparados</span>
+      </div>
+      <div class="stat-item">
+        <span class="stat-value" id="items-curated">0</span>
+        <span class="stat-label">Curados</span>
       </div>
     </div>
 
@@ -117,6 +163,33 @@ import AdminLayout from '../../../layouts/AdminLayout.astro';
           <input type="number" id="config-ai-interval" min="1" value="30" />
         </div>
         <button id="btn-save-config" class="btn-sm primary">Guardar</button>
+      </div>
+      <div class="config-divider"></div>
+      <div class="config-form">
+        <h4 class="config-subtitle">Curador</h4>
+        <div class="config-group">
+          <label>
+            <input type="checkbox" id="config-curator-enabled" />
+            Curador Automatico
+          </label>
+        </div>
+        <div class="config-group">
+          <label>Intervalo Curador (min)</label>
+          <input type="number" id="config-curator-interval" min="30" value="120" />
+        </div>
+        <div class="config-group">
+          <label>Noticias a publicar</label>
+          <input type="number" id="config-curator-target" min="5" max="20" value="12" />
+        </div>
+        <div class="config-group">
+          <label>Max por categoria</label>
+          <input type="number" id="config-curator-max-category" min="1" max="5" value="3" />
+        </div>
+        <div class="config-group">
+          <label>Max por fuente</label>
+          <input type="number" id="config-curator-max-source" min="1" max="5" value="3" />
+        </div>
+        <button id="btn-save-curator-config" class="btn-sm primary">Guardar Curador</button>
       </div>
     </details>
 
@@ -252,6 +325,7 @@ import AdminLayout from '../../../layouts/AdminLayout.astro';
     document.getElementById('items-scraped')!.textContent = status.items_processed.scraped.toLocaleString();
     document.getElementById('items-ai')!.textContent = status.items_processed.ai_processed.toLocaleString();
     document.getElementById('items-prepared')!.textContent = status.items_processed.prepared.toLocaleString();
+    document.getElementById('items-curated')!.textContent = (status.items_processed.curated || 0).toLocaleString();
 
     // Activity card
     const activityCard = document.getElementById('activity-card')!;
@@ -264,9 +338,10 @@ import AdminLayout from '../../../layouts/AdminLayout.astro';
     const stepScraping = document.getElementById('step-scraping')!;
     const stepAI = document.getElementById('step-ai')!;
     const stepPrepare = document.getElementById('step-prepare')!;
+    const stepCurate = document.getElementById('step-curate')!;
 
     // Reset all steps
-    [stepScraping, stepAI, stepPrepare].forEach(step => step.setAttribute('data-status', 'idle'));
+    [stepScraping, stepAI, stepPrepare, stepCurate].forEach(step => step.setAttribute('data-status', 'idle'));
 
     const currentTask = status.current_task;
 
@@ -297,6 +372,14 @@ import AdminLayout from '../../../layouts/AdminLayout.astro';
         stepAI.setAttribute('data-status', 'done');
         stepPrepare.setAttribute('data-status', 'active');
         document.getElementById('step-prepare-detail')!.textContent = 'Ejecutando...';
+      } else if (currentTask.includes('Curación') || currentTask.includes('curación')) {
+        activityTitle.textContent = 'Curación de Noticias';
+        activityDetail.textContent = 'Seleccionando y publicando las mejores noticias...';
+        stepScraping.setAttribute('data-status', 'done');
+        stepAI.setAttribute('data-status', 'done');
+        stepPrepare.setAttribute('data-status', 'done');
+        stepCurate.setAttribute('data-status', 'active');
+        document.getElementById('step-curate-detail')!.textContent = 'Ejecutando...';
       } else {
         activityTitle.textContent = currentTask;
         activityDetail.textContent = '';
@@ -324,6 +407,18 @@ import AdminLayout from '../../../layouts/AdminLayout.astro';
     // Update config inputs
     (document.getElementById('config-scrape-interval') as HTMLInputElement).value = status.config.scrape_interval_minutes;
     (document.getElementById('config-ai-interval') as HTMLInputElement).value = status.config.ai_process_interval_minutes;
+
+    // Update curator config inputs
+    (document.getElementById('config-curator-enabled') as HTMLInputElement).checked = status.config.curator_enabled || false;
+    (document.getElementById('config-curator-interval') as HTMLInputElement).value = status.config.curator_interval_minutes || 120;
+    (document.getElementById('config-curator-target') as HTMLInputElement).value = status.config.curator_target_count || 12;
+    (document.getElementById('config-curator-max-category') as HTMLInputElement).value = status.config.curator_max_per_category || 3;
+    (document.getElementById('config-curator-max-source') as HTMLInputElement).value = status.config.curator_max_per_source || 3;
+
+    // Show next curate time if enabled
+    if (status.config.curator_enabled && status.next_curate) {
+      document.getElementById('step-curate-detail')!.textContent = `Próximo: ${formatTime(status.next_curate)}`;
+    }
   }
 
   function setButtonsDisabled(disabled: boolean) {
@@ -452,6 +547,67 @@ import AdminLayout from '../../../layouts/AdminLayout.astro';
     }
   }
 
+  async function saveCuratorConfig() {
+    const config = {
+      curator_enabled: (document.getElementById('config-curator-enabled') as HTMLInputElement).checked,
+      curator_interval_minutes: parseInt((document.getElementById('config-curator-interval') as HTMLInputElement).value),
+      curator_target_count: parseInt((document.getElementById('config-curator-target') as HTMLInputElement).value),
+      curator_max_per_category: parseInt((document.getElementById('config-curator-max-category') as HTMLInputElement).value),
+      curator_max_per_source: parseInt((document.getElementById('config-curator-max-source') as HTMLInputElement).value),
+    };
+
+    try {
+      await authFetch('/api/scraper/config', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(config)
+      });
+      alert('Configuracion del curador guardada');
+    } catch (error: any) {
+      alert(`Error: ${error.message}`);
+    }
+  }
+
+  async function curatePreview() {
+    try {
+      setButtonsDisabled(true);
+      const response = await authFetch('/api/scraper/curate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ dry_run: true })
+      });
+      if (response.ok) {
+        alert('Vista previa solicitada - ver logs para detalles');
+      }
+      startFastPolling();
+    } catch (error: any) {
+      setButtonsDisabled(false);
+      alert(`Error: ${error.message}`);
+    }
+  }
+
+  async function curateNow() {
+    if (!confirm('Esto seleccionará y publicará automaticamente las mejores noticias. ¿Continuar?')) {
+      return;
+    }
+
+    try {
+      setButtonsDisabled(true);
+      const response = await authFetch('/api/scraper/curate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ dry_run: false })
+      });
+      if (response.ok) {
+        alert('Curación iniciada - ver logs para progreso');
+      }
+      startFastPolling();
+    } catch (error: any) {
+      setButtonsDisabled(false);
+      alert(`Error: ${error.message}`);
+    }
+  }
+
   // Fast polling when waiting for task
   let fastPollingInterval: number | null = null;
 
@@ -481,8 +637,11 @@ import AdminLayout from '../../../layouts/AdminLayout.astro';
     document.getElementById('btn-run-now')?.addEventListener('click', runNow);
     document.getElementById('btn-process-ai')?.addEventListener('click', processAI);
     document.getElementById('btn-save-config')?.addEventListener('click', saveConfig);
+    document.getElementById('btn-save-curator-config')?.addEventListener('click', saveCuratorConfig);
     document.getElementById('btn-select-all')?.addEventListener('click', selectAllSources);
     document.getElementById('btn-select-none')?.addEventListener('click', selectNoSources);
+    document.getElementById('btn-curate-preview')?.addEventListener('click', curatePreview);
+    document.getElementById('btn-curate-now')?.addEventListener('click', curateNow);
   });
 
   window.addEventListener('beforeunload', () => {
@@ -737,6 +896,85 @@ import AdminLayout from '../../../layouts/AdminLayout.astro';
     border-radius: 50%;
     border-top-color: transparent;
     animation: spin 0.8s linear infinite;
+  }
+
+  /* Curator Section */
+  .curator-section {
+    background: var(--bg-card);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg);
+    padding: 20px;
+    margin-bottom: 20px;
+  }
+
+  .curator-header {
+    margin-bottom: 16px;
+  }
+
+  .curator-header h3 {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin: 0 0 4px 0;
+  }
+
+  .curator-description {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+  }
+
+  .curator-actions {
+    display: flex;
+    gap: 12px;
+  }
+
+  .curator-btn {
+    flex: 1;
+    padding: 12px 16px;
+  }
+
+  .curator-status {
+    margin-top: 16px;
+    padding: 12px;
+    background: var(--bg-secondary);
+    border-radius: var(--radius-md);
+  }
+
+  .curator-info {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+  }
+
+  .curator-info .separator {
+    color: var(--border-subtle);
+  }
+
+  /* Config subtitle */
+  .config-subtitle {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin: 0 0 12px 0;
+  }
+
+  .config-divider {
+    height: 1px;
+    background: var(--border-subtle);
+    margin: 16px 0;
+  }
+
+  .config-group label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .config-group input[type="checkbox"] {
+    width: auto;
   }
 
   /* Stats Row */

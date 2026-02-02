@@ -186,6 +186,20 @@ import AdminLayout from '../../../layouts/AdminLayout.astro';
               <span>Fuente Activa</span>
             </label>
           </div>
+
+          <div class="form-group auto-publish-section">
+            <label class="checkbox-label">
+              <input type="checkbox" id="source-auto-publish" />
+              <span>Auto-Publicar</span>
+            </label>
+            <small class="form-hint">Items de esta fuente se publicarán automáticamente después del delay</small>
+          </div>
+
+          <div class="form-group" id="auto-publish-delay-group" style="display: none;">
+            <label class="form-label">Delay de Auto-Publicación (minutos)</label>
+            <input type="number" id="source-auto-publish-delay" class="form-input" min="0" value="15" />
+            <small class="form-hint">Minutos de espera antes de auto-publicar (ventana de revisión)</small>
+          </div>
         </form>
       </div>
       <div class="modal-footer">
@@ -255,7 +269,10 @@ import AdminLayout from '../../../layouts/AdminLayout.astro';
           </button>
         </td>
         <td>
-          <div class="source-name">${source.name}</div>
+          <div class="source-name">
+            ${source.name}
+            ${source.auto_publish ? '<span class="auto-badge" title="Auto-publicación activa">Auto</span>' : ''}
+          </div>
           <div class="source-meta">${source.slug}</div>
         </td>
         <td><span class="type-badge">${source.scraper_type}</span></td>
@@ -347,13 +364,25 @@ import AdminLayout from '../../../layouts/AdminLayout.astro';
         (document.getElementById('source-ai-prompt') as HTMLTextAreaElement).value = source.ai_prompt || '';
         (document.getElementById('source-notes') as HTMLTextAreaElement).value = source.notes || '';
         (document.getElementById('source-active') as HTMLInputElement).checked = source.is_active;
+        (document.getElementById('source-auto-publish') as HTMLInputElement).checked = source.auto_publish || false;
+        (document.getElementById('source-auto-publish-delay') as HTMLInputElement).value = source.auto_publish_delay_minutes || 15;
+        updateAutoPublishDelayVisibility();
       }
     } else {
       title.textContent = 'Nueva Fuente';
       (document.getElementById('source-id') as HTMLInputElement).value = '';
+      (document.getElementById('source-auto-publish') as HTMLInputElement).checked = false;
+      (document.getElementById('source-auto-publish-delay') as HTMLInputElement).value = '15';
+      updateAutoPublishDelayVisibility();
     }
 
     modal.style.display = 'flex';
+  }
+
+  function updateAutoPublishDelayVisibility() {
+    const autoPublishChecked = (document.getElementById('source-auto-publish') as HTMLInputElement).checked;
+    const delayGroup = document.getElementById('auto-publish-delay-group')!;
+    delayGroup.style.display = autoPublishChecked ? 'block' : 'none';
   }
 
   async function saveSource() {
@@ -374,6 +403,8 @@ import AdminLayout from '../../../layouts/AdminLayout.astro';
       ai_prompt: (document.getElementById('source-ai-prompt') as HTMLTextAreaElement).value || null,
       notes: (document.getElementById('source-notes') as HTMLTextAreaElement).value || null,
       is_active: (document.getElementById('source-active') as HTMLInputElement).checked,
+      auto_publish: (document.getElementById('source-auto-publish') as HTMLInputElement).checked,
+      auto_publish_delay_minutes: parseInt((document.getElementById('source-auto-publish-delay') as HTMLInputElement).value) || 15,
     };
 
     try {
@@ -421,6 +452,9 @@ import AdminLayout from '../../../layouts/AdminLayout.astro';
     document.getElementById('edit-modal')!.style.display = 'none';
   });
   document.getElementById('btn-save')?.addEventListener('click', saveSource);
+
+  // Auto-publish checkbox toggle
+  document.getElementById('source-auto-publish')?.addEventListener('change', updateAutoPublishDelayVisibility);
 
   // Filter tabs
   document.querySelectorAll('.filter-tab').forEach(tab => {
@@ -627,6 +661,20 @@ import AdminLayout from '../../../layouts/AdminLayout.astro';
     font-weight: 600;
     color: var(--text-primary);
     margin-bottom: 2px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .auto-badge {
+    display: inline-block;
+    padding: 2px 6px;
+    background: rgba(34, 197, 94, 0.15);
+    color: #22c55e;
+    border-radius: 8px;
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
   }
 
   .source-meta {
