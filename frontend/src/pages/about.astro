@@ -1,0 +1,1027 @@
+---
+import Layout from '../layouts/Layout.astro';
+
+const agents = [
+  {
+    name: 'Agente Radar',
+    role: 'Detección',
+    description: 'Monitorea continuamente múltiples medios digitales, identificando noticias relevantes y filtrando el ruido informativo en tiempo real.',
+    icon: 'radar'
+  },
+  {
+    name: 'Agente Síntesis',
+    role: 'Procesamiento',
+    description: 'Analiza y condensa la información, eliminando redundancias y extrayendo los datos esenciales de cada noticia.',
+    icon: 'layers'
+  },
+  {
+    name: 'Agente Contexto',
+    role: 'Enriquecimiento',
+    description: 'Incorpora antecedentes, datos históricos y relaciones entre eventos para dar profundidad a cada publicación.',
+    icon: 'link'
+  },
+  {
+    name: 'Agente Tendencias',
+    role: 'Análisis',
+    description: 'Detecta patrones emergentes, temas en desarrollo y conexiones entre noticias que podrían pasar desapercibidas.',
+    icon: 'trending'
+  }
+];
+
+const steps = [
+  {
+    number: '01',
+    title: 'Detección',
+    description: 'Nuestros agentes monitorean medios digitales las 24 horas, identificando información relevante.'
+  },
+  {
+    number: '02',
+    title: 'Análisis',
+    description: 'Se procesan múltiples fuentes para cruzar datos y verificar consistencia informativa.'
+  },
+  {
+    number: '03',
+    title: 'Síntesis',
+    description: 'La información se condensa en formatos claros, eliminando ruido y redundancias.'
+  },
+  {
+    number: '04',
+    title: 'Revisión',
+    description: 'Un editor humano valida, contextualiza y decide la publicación final.'
+  }
+];
+---
+
+<Layout title="Sobre Nosotros - La Data Justa">
+  <main class="landing">
+    <!-- Hero Section -->
+    <section class="hero">
+      <div class="hero-content">
+        <div class="hero-badge">Periodismo + Inteligencia Artificial</div>
+        <h1 class="hero-title">
+          La información que necesitás.<br/>
+          <span class="hero-highlight">Sin vueltas.</span>
+        </h1>
+        <p class="hero-subtitle">
+          Un medio digital que utiliza inteligencia artificial como herramienta
+          para procesar información, manteniendo siempre el criterio humano
+          como garantía editorial.
+        </p>
+        <div class="hero-cta">
+          <a href="#como-funciona" class="btn-primary">Conocé cómo funciona</a>
+          <a href="/" class="btn-secondary">Ver las noticias</a>
+        </div>
+      </div>
+      <div class="hero-visual">
+        <div class="hero-graphic">
+          <div class="pulse-ring"></div>
+          <div class="pulse-ring delay-1"></div>
+          <div class="pulse-ring delay-2"></div>
+          <div class="center-dot"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ¿Qué es? Section -->
+    <section class="section section-alt" id="que-es">
+      <div class="container">
+        <div class="section-header">
+          <span class="section-label">01 — Nuestra propuesta</span>
+          <h2 class="section-title">¿Qué es La Data Justa?</h2>
+        </div>
+        <div class="text-block">
+          <p class="lead">
+            Somos un medio digital que combina tecnología de inteligencia artificial
+            con criterio periodístico humano para ofrecer información clara,
+            contextualizada y sin exceso de ruido.
+          </p>
+          <p>
+            En un ecosistema mediático saturado de contenido, la IA nos permite
+            procesar grandes volúmenes de información de manera eficiente. Pero
+            la decisión final —qué publicar, cómo contextualizarlo, qué priorizar—
+            siempre pasa por manos humanas.
+          </p>
+          <p>
+            No reemplazamos el periodismo. Lo potenciamos con herramientas que
+            permiten hacer más con menos, manteniendo la rigurosidad y el compromiso
+            con la verdad.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Cómo funciona Section -->
+    <section class="section" id="como-funciona">
+      <div class="container">
+        <div class="section-header">
+          <span class="section-label">02 — El proceso</span>
+          <h2 class="section-title">Cómo funciona nuestro sistema</h2>
+        </div>
+        <div class="steps-grid">
+          {steps.map((step) => (
+            <div class="step-card">
+              <span class="step-number">{step.number}</span>
+              <h3 class="step-title">{step.title}</h3>
+              <p class="step-description">{step.description}</p>
+            </div>
+          ))}
+        </div>
+        <div class="process-note">
+          <div class="note-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="24" height="24">
+              <circle cx="12" cy="12" r="10"/>
+              <path d="M12 16v-4M12 8h.01"/>
+            </svg>
+          </div>
+          <p>
+            La automatización acelera el proceso, pero nunca elimina la supervisión humana.
+            Cada publicación pasa por revisión editorial antes de hacerse pública.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Agentes Section -->
+    <section class="section section-alt" id="agentes">
+      <div class="container">
+        <div class="section-header">
+          <span class="section-label">03 — La tecnología</span>
+          <h2 class="section-title">Nuestros Agentes de IA</h2>
+          <p class="section-subtitle">
+            Cuatro sistemas especializados que trabajan en conjunto para procesar
+            y estructurar la información.
+          </p>
+        </div>
+        <div class="agents-grid">
+          {agents.map((agent) => (
+            <div class="agent-card">
+              <div class="agent-icon">
+                {agent.icon === 'radar' && (
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="32" height="32">
+                    <circle cx="12" cy="12" r="10"/>
+                    <circle cx="12" cy="12" r="6"/>
+                    <circle cx="12" cy="12" r="2"/>
+                    <path d="M12 2v4M12 18v4"/>
+                  </svg>
+                )}
+                {agent.icon === 'layers' && (
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="32" height="32">
+                    <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+                    <path d="M2 17l10 5 10-5"/>
+                    <path d="M2 12l10 5 10-5"/>
+                  </svg>
+                )}
+                {agent.icon === 'link' && (
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="32" height="32">
+                    <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
+                    <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
+                  </svg>
+                )}
+                {agent.icon === 'trending' && (
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="32" height="32">
+                    <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/>
+                    <polyline points="17 6 23 6 23 12"/>
+                  </svg>
+                )}
+              </div>
+              <div class="agent-role">{agent.role}</div>
+              <h3 class="agent-name">{agent.name}</h3>
+              <p class="agent-description">{agent.description}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+
+    <!-- Editor Humano Section -->
+    <section class="section" id="editor">
+      <div class="container">
+        <div class="editor-grid">
+          <div class="editor-content">
+            <span class="section-label">04 — El factor humano</span>
+            <h2 class="section-title">La última palabra es humana</h2>
+            <p class="lead">
+              La inteligencia artificial es una herramienta poderosa, pero no tiene
+              criterio ético, sensibilidad contextual ni responsabilidad editorial.
+            </p>
+            <ul class="editor-list">
+              <li>
+                <span class="check-icon">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
+                    <polyline points="20 6 9 17 4 12"/>
+                  </svg>
+                </span>
+                <span>Revisión de cada publicación antes de hacerse pública</span>
+              </li>
+              <li>
+                <span class="check-icon">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
+                    <polyline points="20 6 9 17 4 12"/>
+                  </svg>
+                </span>
+                <span>Decisión editorial sobre qué información es relevante</span>
+              </li>
+              <li>
+                <span class="check-icon">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
+                    <polyline points="20 6 9 17 4 12"/>
+                  </svg>
+                </span>
+                <span>Contextualización y verificación de datos sensibles</span>
+              </li>
+              <li>
+                <span class="check-icon">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
+                    <polyline points="20 6 9 17 4 12"/>
+                  </svg>
+                </span>
+                <span>Garantía de criterio ético en cada decisión</span>
+              </li>
+            </ul>
+          </div>
+          <div class="editor-visual">
+            <div class="editor-card">
+              <div class="editor-avatar">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="48" height="48">
+                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                  <circle cx="12" cy="7" r="4"/>
+                </svg>
+              </div>
+              <div class="editor-info">
+                <span class="editor-label">Rol</span>
+                <span class="editor-role">Editor Principal</span>
+              </div>
+              <div class="editor-quote">
+                "La IA procesa. El humano decide."
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Transparencia Section -->
+    <section class="section section-alt" id="transparencia">
+      <div class="container">
+        <div class="section-header centered">
+          <span class="section-label">05 — Compromiso</span>
+          <h2 class="section-title">Transparencia informativa</h2>
+        </div>
+        <div class="transparency-grid">
+          <div class="transparency-card">
+            <div class="transparency-badge detected">Detectado en medios</div>
+            <p>
+              Indica que la información fue identificada y procesada a partir
+              del monitoreo de múltiples fuentes públicas.
+            </p>
+          </div>
+          <div class="transparency-card">
+            <div class="transparency-badge sources">Múltiples fuentes</div>
+            <p>
+              Señala que el contenido fue construido cruzando información
+              de diversos medios para mayor precisión.
+            </p>
+          </div>
+          <div class="transparency-card">
+            <div class="transparency-badge editorial">Editorial</div>
+            <p>
+              Contenido de opinión o análisis elaborado por el equipo editorial,
+              claramente diferenciado de la información factual.
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Diferencial Section -->
+    <section class="section" id="diferencial">
+      <div class="container">
+        <div class="section-header centered">
+          <span class="section-label">06 — La diferencia</span>
+          <h2 class="section-title">Periodismo del futuro, hoy</h2>
+        </div>
+        <div class="comparison-grid">
+          <div class="comparison-card traditional">
+            <h3>Medios tradicionales</h3>
+            <ul>
+              <li>Saturación de contenido</li>
+              <li>Titulares sensacionalistas</li>
+              <li>Información fragmentada</li>
+              <li>Difícil acceso al contexto</li>
+            </ul>
+          </div>
+          <div class="comparison-card modern">
+            <h3>La Data Justa</h3>
+            <ul>
+              <li>Información condensada y clara</li>
+              <li>Títulos que informan, no venden</li>
+              <li>Contexto integrado</li>
+              <li>Tecnología al servicio del lector</li>
+            </ul>
+          </div>
+        </div>
+        <div class="final-cta">
+          <p class="cta-text">
+            Menos ruido. Más claridad. Tu tiempo vale.
+          </p>
+          <a href="/" class="btn-primary btn-large">Explorar las noticias</a>
+        </div>
+      </div>
+    </section>
+
+  </main>
+</Layout>
+
+<style>
+  /* Base */
+  .landing {
+    --accent: #2563eb;
+    --accent-light: #3b82f6;
+    --accent-dark: #1d4ed8;
+    --success: #10b981;
+    --warning: #f59e0b;
+  }
+
+  .container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 1.5rem;
+  }
+
+  /* Hero */
+  .hero {
+    min-height: 90vh;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4rem;
+    align-items: center;
+    padding: 6rem 1.5rem;
+    max-width: 1400px;
+    margin: 0 auto;
+  }
+
+  .hero-badge {
+    display: inline-block;
+    padding: 0.5rem 1rem;
+    background: var(--accent);
+    color: white;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    border-radius: 2rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .hero-title {
+    font-size: clamp(2.5rem, 5vw, 4rem);
+    font-weight: 800;
+    line-height: 1.1;
+    margin: 0 0 1.5rem;
+    color: var(--text-primary);
+  }
+
+  .hero-highlight {
+    color: var(--accent);
+  }
+
+  .hero-subtitle {
+    font-size: 1.25rem;
+    line-height: 1.7;
+    color: var(--text-secondary);
+    margin: 0 0 2rem;
+    max-width: 540px;
+  }
+
+  .hero-cta {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+  }
+
+  .btn-primary, .btn-secondary {
+    display: inline-flex;
+    align-items: center;
+    padding: 1rem 2rem;
+    font-size: 1rem;
+    font-weight: 600;
+    border-radius: 0.5rem;
+    text-decoration: none;
+    transition: all 0.2s ease;
+  }
+
+  .btn-primary {
+    background: var(--accent);
+    color: white;
+  }
+
+  .btn-primary:hover {
+    background: var(--accent-dark);
+    transform: translateY(-2px);
+  }
+
+  .btn-secondary {
+    background: transparent;
+    color: var(--text-primary);
+    border: 2px solid var(--border-color);
+  }
+
+  .btn-secondary:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+
+  .btn-large {
+    padding: 1.25rem 3rem;
+    font-size: 1.125rem;
+  }
+
+  /* Hero Visual */
+  .hero-visual {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+  }
+
+  .hero-graphic {
+    position: relative;
+    width: 300px;
+    height: 300px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+  }
+
+  .pulse-ring {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    border: 2px solid var(--accent);
+    border-radius: 50%;
+    opacity: 0.3;
+    animation: pulse 3s ease-out infinite;
+  }
+
+  .pulse-ring.delay-1 {
+    animation-delay: 1s;
+  }
+
+  .pulse-ring.delay-2 {
+    animation-delay: 2s;
+  }
+
+  .center-dot {
+    width: 20px;
+    height: 20px;
+    background: var(--accent);
+    border-radius: 50%;
+    z-index: 1;
+  }
+
+  @keyframes pulse {
+    0% {
+      transform: scale(0.3);
+      opacity: 0.6;
+    }
+    100% {
+      transform: scale(1);
+      opacity: 0;
+    }
+  }
+
+  /* Sections */
+  .section {
+    padding: 6rem 0;
+  }
+
+  .section-alt {
+    background: var(--bg-secondary);
+  }
+
+  .section-header {
+    margin-bottom: 3rem;
+  }
+
+  .section-header.centered {
+    text-align: center;
+  }
+
+  .section-label {
+    display: block;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--accent);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    margin-bottom: 0.75rem;
+  }
+
+  .section-title {
+    font-size: clamp(1.75rem, 4vw, 2.5rem);
+    font-weight: 700;
+    margin: 0;
+    color: var(--text-primary);
+  }
+
+  .section-subtitle {
+    font-size: 1.125rem;
+    color: var(--text-secondary);
+    margin: 1rem 0 0;
+    max-width: 600px;
+  }
+
+  .section-header.centered .section-subtitle {
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  /* Text Block */
+  .text-block {
+    max-width: 800px;
+  }
+
+  .lead {
+    font-size: 1.375rem;
+    line-height: 1.7;
+    color: var(--text-primary);
+    margin: 0 0 1.5rem;
+    font-weight: 500;
+  }
+
+  .text-block p {
+    font-size: 1.125rem;
+    line-height: 1.8;
+    color: var(--text-secondary);
+    margin: 0 0 1.25rem;
+  }
+
+  /* Steps */
+  .steps-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 2rem;
+    margin-bottom: 3rem;
+  }
+
+  .step-card {
+    padding: 2rem;
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 1rem;
+    transition: all 0.3s ease;
+  }
+
+  .step-card:hover {
+    border-color: var(--accent);
+    transform: translateY(-4px);
+  }
+
+  .step-number {
+    display: block;
+    font-size: 2.5rem;
+    font-weight: 800;
+    color: var(--accent);
+    opacity: 0.3;
+    margin-bottom: 1rem;
+  }
+
+  .step-title {
+    font-size: 1.25rem;
+    font-weight: 700;
+    margin: 0 0 0.75rem;
+    color: var(--text-primary);
+  }
+
+  .step-description {
+    font-size: 0.9375rem;
+    line-height: 1.6;
+    color: var(--text-secondary);
+    margin: 0;
+  }
+
+  .process-note {
+    display: flex;
+    align-items: flex-start;
+    gap: 1rem;
+    padding: 1.5rem;
+    background: var(--bg-secondary);
+    border-left: 3px solid var(--accent);
+    border-radius: 0 0.5rem 0.5rem 0;
+  }
+
+  .note-icon {
+    color: var(--accent);
+    flex-shrink: 0;
+  }
+
+  .process-note p {
+    margin: 0;
+    font-size: 1rem;
+    color: var(--text-secondary);
+    line-height: 1.6;
+  }
+
+  /* Agents */
+  .agents-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1.5rem;
+  }
+
+  .agent-card {
+    padding: 2rem;
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 1rem;
+    transition: all 0.3s ease;
+  }
+
+  .agent-card:hover {
+    border-color: var(--accent);
+  }
+
+  .agent-icon {
+    width: 64px;
+    height: 64px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--bg-secondary);
+    border-radius: 1rem;
+    margin-bottom: 1.5rem;
+    color: var(--accent);
+  }
+
+  .agent-role {
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--accent);
+    margin-bottom: 0.5rem;
+  }
+
+  .agent-name {
+    font-size: 1.25rem;
+    font-weight: 700;
+    margin: 0 0 1rem;
+    color: var(--text-primary);
+  }
+
+  .agent-description {
+    font-size: 0.9375rem;
+    line-height: 1.6;
+    color: var(--text-secondary);
+    margin: 0;
+  }
+
+  /* Editor */
+  .editor-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4rem;
+    align-items: center;
+  }
+
+  .editor-content .section-title {
+    margin-bottom: 1.5rem;
+  }
+
+  .editor-content .lead {
+    margin-bottom: 2rem;
+  }
+
+  .editor-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
+
+  .editor-list li {
+    display: flex;
+    align-items: flex-start;
+    gap: 1rem;
+    padding: 1rem 0;
+    border-bottom: 1px solid var(--border-color);
+    font-size: 1.0625rem;
+    color: var(--text-secondary);
+  }
+
+  .editor-list li:last-child {
+    border-bottom: none;
+  }
+
+  .check-icon {
+    color: var(--success);
+    flex-shrink: 0;
+    margin-top: 2px;
+  }
+
+  .editor-visual {
+    display: flex;
+    justify-content: center;
+  }
+
+  .editor-card {
+    padding: 3rem;
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 1.5rem;
+    text-align: center;
+    max-width: 320px;
+  }
+
+  .editor-avatar {
+    width: 100px;
+    height: 100px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--bg-secondary);
+    border-radius: 50%;
+    margin: 0 auto 1.5rem;
+    color: var(--accent);
+  }
+
+  .editor-info {
+    margin-bottom: 1.5rem;
+  }
+
+  .editor-label {
+    display: block;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--text-muted);
+    margin-bottom: 0.25rem;
+  }
+
+  .editor-role {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--text-primary);
+  }
+
+  .editor-quote {
+    font-size: 1.125rem;
+    font-style: italic;
+    color: var(--text-secondary);
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--border-color);
+  }
+
+  /* Transparency */
+  .transparency-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 2rem;
+  }
+
+  .transparency-card {
+    padding: 2rem;
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 1rem;
+    text-align: center;
+  }
+
+  .transparency-badge {
+    display: inline-block;
+    padding: 0.5rem 1rem;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    border-radius: 2rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .transparency-badge.detected {
+    background: rgba(37, 99, 235, 0.1);
+    color: var(--accent);
+  }
+
+  .transparency-badge.sources {
+    background: rgba(16, 185, 129, 0.1);
+    color: var(--success);
+  }
+
+  .transparency-badge.editorial {
+    background: rgba(245, 158, 11, 0.1);
+    color: var(--warning);
+  }
+
+  .transparency-card p {
+    font-size: 0.9375rem;
+    line-height: 1.6;
+    color: var(--text-secondary);
+    margin: 0;
+  }
+
+  /* Comparison */
+  .comparison-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2rem;
+    margin-bottom: 4rem;
+  }
+
+  .comparison-card {
+    padding: 2.5rem;
+    border-radius: 1rem;
+  }
+
+  .comparison-card.traditional {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+  }
+
+  .comparison-card.modern {
+    background: var(--accent);
+    color: white;
+  }
+
+  .comparison-card h3 {
+    font-size: 1.25rem;
+    font-weight: 700;
+    margin: 0 0 1.5rem;
+  }
+
+  .comparison-card ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
+
+  .comparison-card li {
+    padding: 0.75rem 0;
+    font-size: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+
+  .comparison-card.traditional li {
+    color: var(--text-secondary);
+  }
+
+  .comparison-card.traditional li::before {
+    content: '—';
+    color: var(--text-muted);
+  }
+
+  .comparison-card.modern li::before {
+    content: '✓';
+    font-weight: bold;
+  }
+
+  .final-cta {
+    text-align: center;
+  }
+
+  .cta-text {
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin: 0 0 2rem;
+  }
+
+  /* Footer */
+  .landing-footer {
+    padding: 4rem 0 2rem;
+    background: var(--bg-secondary);
+    border-top: 1px solid var(--border-color);
+  }
+
+  .footer-content {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-bottom: 2rem;
+    border-bottom: 1px solid var(--border-color);
+    margin-bottom: 2rem;
+  }
+
+  .footer-logo {
+    font-size: 1.5rem;
+    font-weight: 800;
+    color: var(--text-primary);
+  }
+
+  .footer-tagline {
+    font-size: 0.9375rem;
+    color: var(--text-secondary);
+    margin: 0.5rem 0 0;
+  }
+
+  .footer-links {
+    display: flex;
+    gap: 2rem;
+  }
+
+  .footer-links a {
+    color: var(--text-secondary);
+    text-decoration: none;
+    font-size: 0.9375rem;
+    transition: color 0.2s ease;
+  }
+
+  .footer-links a:hover {
+    color: var(--accent);
+  }
+
+  .footer-bottom {
+    text-align: center;
+  }
+
+  .footer-bottom p {
+    font-size: 0.875rem;
+    color: var(--text-muted);
+    margin: 0;
+  }
+
+  /* Responsive */
+  @media (max-width: 1024px) {
+    .hero {
+      grid-template-columns: 1fr;
+      text-align: center;
+      min-height: auto;
+      padding: 4rem 1.5rem;
+    }
+
+    .hero-subtitle {
+      margin-left: auto;
+      margin-right: auto;
+    }
+
+    .hero-cta {
+      justify-content: center;
+    }
+
+    .hero-visual {
+      order: -1;
+    }
+
+    .hero-graphic {
+      width: 200px;
+      height: 200px;
+    }
+
+    .steps-grid {
+      grid-template-columns: repeat(2, 1fr);
+    }
+
+    .agents-grid {
+      grid-template-columns: repeat(2, 1fr);
+    }
+
+    .editor-grid {
+      grid-template-columns: 1fr;
+      gap: 3rem;
+    }
+
+    .editor-visual {
+      order: -1;
+    }
+
+    .comparison-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  @media (max-width: 640px) {
+    .section {
+      padding: 4rem 0;
+    }
+
+    .steps-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .agents-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .transparency-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .hero-cta {
+      flex-direction: column;
+    }
+
+    .btn-primary, .btn-secondary {
+      width: 100%;
+      justify-content: center;
+    }
+
+    .footer-content {
+      flex-direction: column;
+      text-align: center;
+      gap: 2rem;
+    }
+
+    .footer-links {
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+  }
+</style>
