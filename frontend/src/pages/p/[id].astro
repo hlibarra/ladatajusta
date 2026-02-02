@@ -48,6 +48,7 @@ interface DisplayConfig {
 
 const { id } = Astro.params;
 const API_BASE = import.meta.env.PUBLIC_API_BASE_URL ?? 'http://localhost:8000';
+const CLIENT_API_BASE = import.meta.env.PUBLIC_CLIENT_API_BASE_URL ?? import.meta.env.PUBLIC_API_BASE_URL ?? '';
 
 let pub: Publication | null = null;
 let error = false;
@@ -251,7 +252,7 @@ function getOriginLabel(originType: string | null | undefined): string | null {
 			)}
 
 			<footer class="article-footer">
-				<div class="votes" data-id={pub.id}>
+				<div class="votes" data-id={pub.id} data-api={CLIENT_API_BASE}>
 					<span class="votes-label">Esta noticia te pareció:</span>
 					<div class="vote-buttons">
 						<button class="vote-btn hot" data-type="hot">
@@ -272,11 +273,10 @@ function getOriginLabel(originType: string | null | undefined): string | null {
 </Layout>
 
 <script is:inline>
-	const API_BASE = 'http://localhost:8000';
-
 	const votesDiv = document.querySelector('.votes');
 
 	if (votesDiv) {
+		const API_BASE = votesDiv.getAttribute('data-api') || '';
 		const id = votesDiv.getAttribute('data-id');
 		const countsEl = votesDiv.querySelector('.vote-counts');
 		const hotBtn = votesDiv.querySelector('button.vote-btn.hot');
