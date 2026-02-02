@@ -240,11 +240,23 @@ import AdminLayout from '../../../layouts/AdminLayout.astro';
   }
 
   async function saveUser() {
-    const id = (document.getElementById('user-id') as HTMLInputElement).value;
-    const email = (document.getElementById('user-email') as HTMLInputElement).value.trim();
-    const password = (document.getElementById('user-password') as HTMLInputElement).value;
-    const isAdmin = (document.getElementById('user-admin') as HTMLInputElement).checked;
-    const isActive = (document.getElementById('user-active') as HTMLInputElement).checked;
+    const idInput = document.getElementById('user-id') as HTMLInputElement | null;
+    const emailInput = document.getElementById('user-email') as HTMLInputElement | null;
+    const passwordInput = document.getElementById('user-password') as HTMLInputElement | null;
+    const adminInput = document.getElementById('user-admin') as HTMLInputElement | null;
+    const activeInput = document.getElementById('user-active') as HTMLInputElement | null;
+
+    if (!emailInput || !passwordInput || !adminInput || !activeInput) {
+      console.error('Form elements not found');
+      alert('Error: No se encontraron los elementos del formulario');
+      return;
+    }
+
+    const id = idInput?.value || '';
+    const email = emailInput.value?.trim() || '';
+    const password = passwordInput.value || '';
+    const isAdmin = adminInput.checked;
+    const isActive = activeInput.checked;
 
     if (!email) {
       alert('El email es requerido');
