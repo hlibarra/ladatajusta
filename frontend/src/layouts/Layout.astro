@@ -47,6 +47,15 @@ const activeSections = sections.filter(s => s.is_active).slice(0, 6);
 		<meta name="description" content="Noticias cortas, claras y directas al punto." />
 		<title>{title}</title>
 
+		<!-- Google Analytics 4 -->
+		<script is:inline async src="https://www.googletagmanager.com/gtag/js?id=G-9VM8M9HJBE"></script>
+		<script is:inline>
+			window.dataLayer = window.dataLayer || [];
+			function gtag(){dataLayer.push(arguments);}
+			gtag('js', new Date());
+			gtag('config', 'G-9VM8M9HJBE');
+		</script>
+
 		<!-- Google AdSense -->
 		<script is:inline async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-4470721242527756" crossorigin="anonymous"></script>
 
