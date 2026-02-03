@@ -1,0 +1,162 @@
+---
+import Layout from '../layouts/Layout.astro';
+---
+
+<Layout title="Página no encontrada - La Data Justa">
+	<div class="not-found">
+		<div class="content">
+			<span class="error-code">404</span>
+			<h1>Página no encontrada</h1>
+			<p>La página que buscás no existe o fue movida.</p>
+			<div class="actions">
+				<a href="/" class="btn-primary">Ir al inicio</a>
+				<a href="javascript:history.back()" class="btn-secondary">Volver atrás</a>
+			</div>
+		</div>
+
+		<div class="suggestions">
+			<p class="suggestions-title">Podés intentar:</p>
+			<ul>
+				<li>Verificar que la URL esté bien escrita</li>
+				<li>Volver a la página anterior</li>
+				<li>Ir a la página de inicio</li>
+			</ul>
+		</div>
+	</div>
+</Layout>
+
+<style>
+	.not-found {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+		min-height: 60vh;
+		text-align: center;
+		padding: 40px 20px;
+	}
+
+	.content {
+		margin-bottom: 48px;
+	}
+
+	.error-code {
+		display: block;
+		font-size: clamp(6rem, 20vw, 10rem);
+		font-weight: 800;
+		line-height: 1;
+		background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+		-webkit-background-clip: text;
+		-webkit-text-fill-color: transparent;
+		background-clip: text;
+		opacity: 0.8;
+		margin-bottom: 16px;
+	}
+
+	h1 {
+		font-size: clamp(1.5rem, 4vw, 2rem);
+		font-weight: 700;
+		color: var(--text-primary);
+		margin: 0 0 12px;
+	}
+
+	p {
+		font-size: 1.1rem;
+		color: var(--text-secondary);
+		margin: 0 0 32px;
+	}
+
+	.actions {
+		display: flex;
+		gap: 16px;
+		justify-content: center;
+		flex-wrap: wrap;
+	}
+
+	.btn-primary,
+	.btn-secondary {
+		display: inline-flex;
+		align-items: center;
+		padding: 12px 24px;
+		border-radius: var(--radius-md);
+		font-weight: 600;
+		font-size: 0.95rem;
+		transition: all 0.2s ease;
+		text-decoration: none;
+	}
+
+	.btn-primary {
+		background: var(--accent-primary);
+		color: white;
+	}
+
+	.btn-primary:hover {
+		background: var(--accent-secondary);
+		transform: translateY(-2px);
+	}
+
+	.btn-secondary {
+		background: var(--bg-card);
+		color: var(--text-primary);
+		border: 1px solid var(--border-subtle);
+	}
+
+	.btn-secondary:hover {
+		background: var(--bg-card-hover);
+		border-color: var(--border-medium);
+	}
+
+	.suggestions {
+		background: var(--bg-card);
+		border: 1px solid var(--border-subtle);
+		border-radius: var(--radius-lg);
+		padding: 24px 32px;
+		text-align: left;
+		max-width: 400px;
+	}
+
+	.suggestions-title {
+		font-weight: 600;
+		color: var(--text-primary);
+		margin: 0 0 12px;
+		font-size: 0.95rem;
+	}
+
+	.suggestions ul {
+		margin: 0;
+		padding-left: 20px;
+		color: var(--text-secondary);
+		font-size: 0.9rem;
+	}
+
+	.suggestions li {
+		margin-bottom: 8px;
+	}
+
+	.suggestions li:last-child {
+		margin-bottom: 0;
+	}
+
+	@media (max-width: 480px) {
+		.not-found {
+			min-height: 50vh;
+			padding: 32px 16px;
+		}
+
+		.actions {
+			flex-direction: column;
+			width: 100%;
+		}
+
+		.btn-primary,
+		.btn-secondary {
+			width: 100%;
+			justify-content: center;
+		}
+
+		.suggestions {
+			width: 100%;
+			padding: 20px;
+		}
+	}
+</style>
