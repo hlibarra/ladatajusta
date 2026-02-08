@@ -47,7 +47,7 @@ SOURCE_MEDIA = "clarin"
 # Global state
 lock = asyncio.Lock()
 db_pool = None
-scraping_run_id = None
+_scraping_run_id = None
 
 
 def normalize_url(url: str) -> str:
@@ -187,7 +187,7 @@ async def procesar_noticia(context, enlace):
     Procesa una noticia individual y la guarda en la BD
     Returns True if item was inserted, False otherwise
     """
-    global db_pool, scraping_run_id
+    global db_pool, _scraping_run_id
 
     start_time = datetime.now()
     page = await context.new_page()
@@ -385,7 +385,7 @@ async def procesar_noticia(context, enlace):
             'url_hash': url_hash,
             'scraper_name': SCRAPER_NAME,
             'scraper_version': SCRAPER_VERSION,
-            'scraping_run_id': scraping_run_id,
+            'scraping_run_id': _scraping_run_id,
             'scraped_at': start_time,
             'scraping_duration_ms': duration_ms,
             'status': 'scraped',
@@ -414,20 +414,22 @@ async def procesar_noticia(context, enlace):
         await page.close()
 
 
-async def main():
+async def main(scraping_run_id=None):
     """
     Función principal del scraper
     Returns dict with scraping results for orchestrator
-    """
-    global db_pool, scraping_run_id
 
-    # Generar ID único para esta ejecución
-    scraping_run_id = hashlib.sha256(
-        f"{SCRAPER_NAME}_{datetime.now().isoformat()}".encode()
-    ).hexdigest()[:32]
+    Args:
+        scraping_run_id: UUID del scraping_run creado por el orquestador
+    """
+    global db_pool, _scraping_run_id
+
+    # Usar el ID del orquestador si se proporciona
+    _scraping_run_id = scraping_run_id
 
     print(f"[START] Iniciando scraper de Clarín")
-    print(f"[INFO] Run ID: {scraping_run_id}")
+    if scraping_run_id:
+        print(f"[INFO] Run ID: {scraping_run_id}")
 
     items_scraped = 0
     start_time = datetime.now()
@@ -527,7 +529,8 @@ async def main():
             duration = (end_time - start_time).total_seconds()
 
             print(f"\n[OK] Proceso terminado")
-            print(f"[INFO] Run ID: {scraping_run_id}")
+            if scraping_run_id:
+                print(f"[INFO] Run ID: {scraping_run_id}")
             print(f"[INFO] Items scrapeados: {items_scraped}/{len(enlaces)}")
             print(f"[INFO] Duración: {duration:.2f} segundos")
 

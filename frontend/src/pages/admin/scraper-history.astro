@@ -1,0 +1,1581 @@
+---
+import AdminLayout from '../../layouts/AdminLayout.astro';
+
+const title = 'Historial de Scraping';
+---
+
+<AdminLayout title={title}>
+	<div class="history-admin">
+		<!-- Hero Header -->
+		<div class="hero-header">
+			<div class="hero-content">
+				<div class="hero-badge">Historial</div>
+				<h1 class="hero-title">Historial de Scraping</h1>
+				<p class="hero-subtitle">Revisa todas las ejecuciones de scraping del sistema</p>
+			</div>
+			<div class="hero-actions">
+				<button class="btn-refresh" id="btn-refresh" title="Recargar">
+					<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+						<path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/>
+					</svg>
+					Actualizar
+				</button>
+			</div>
+		</div>
+
+		<!-- Stats -->
+		<div id="stats-container" class="stats-grid">
+			<div class="loading-shimmer"></div>
+			<div class="loading-shimmer"></div>
+			<div class="loading-shimmer"></div>
+			<div class="loading-shimmer"></div>
+		</div>
+
+		<!-- Filters -->
+		<div class="filters-section">
+			<div class="filter-group">
+				<label for="status-filter">Estado</label>
+				<select id="status-filter" class="filter-select">
+					<option value="">Todos</option>
+					<option value="running">En ejecución</option>
+					<option value="completed">Completado</option>
+					<option value="failed">Fallido</option>
+					<option value="cancelled">Cancelado</option>
+				</select>
+			</div>
+			<div class="filter-group">
+				<label for="source-filter">Fuente</label>
+				<select id="source-filter" class="filter-select">
+					<option value="">Todas</option>
+					<!-- Will be populated dynamically -->
+				</select>
+			</div>
+			<div class="filter-group">
+				<label for="date-from">Fecha desde</label>
+				<input type="date" id="date-from" class="filter-input" />
+			</div>
+			<div class="filter-group">
+				<label for="date-to">Fecha hasta</label>
+				<input type="date" id="date-to" class="filter-input" />
+			</div>
+			<button class="btn-clear-filters" id="btn-clear-filters">Limpiar filtros</button>
+		</div>
+
+		<!-- Runs Table -->
+		<section class="runs-section">
+			<div class="section-header">
+				<h2 class="section-title">Ejecuciones</h2>
+				<div class="section-meta" id="runs-meta">
+					<span class="meta-badge">Cargando...</span>
+				</div>
+			</div>
+			<div id="runs-container" class="runs-table-wrapper">
+				<div class="loading">Cargando ejecuciones...</div>
+			</div>
+			<div class="pagination" id="pagination">
+				<!-- Pagination buttons will be inserted here -->
+			</div>
+		</section>
+
+		<!-- Details Modal -->
+		<div id="details-modal" class="modal" style="display: none;">
+			<div class="modal-overlay" id="modal-overlay"></div>
+			<div class="modal-content">
+				<div class="modal-header">
+					<h3>Detalles de Ejecución</h3>
+					<button class="modal-close" id="modal-close">
+						<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+							<line x1="18" y1="6" x2="6" y2="18"></line>
+							<line x1="6" y1="6" x2="18" y2="18"></line>
+						</svg>
+					</button>
+				</div>
+				<div class="modal-body" id="modal-body">
+					<div class="loading">Cargando detalles...</div>
+				</div>
+			</div>
+		</div>
+	</div>
+</AdminLayout>
+
+<script>
+	import { authFetch } from '../../lib/auth';
+
+	let currentPage = 0;
+	const limit = 20;
+	let currentFilter = '';
+	let dateFrom = '';
+	let dateTo = '';
+	let sourceFilter = '';
+
+	interface ScrapingRun {
+		id: string;
+		started_at: string;
+		finished_at: string | null;
+		duration_seconds: number | null;
+		status: string;
+		triggered_by: string;
+		sources_processed: string[] | null;
+		items_scraped: number;
+		items_failed: number;
+		items_duplicate: number;
+		errors: any[] | null;
+		error_message: string | null;
+	}
+
+	interface Stats {
+		total_runs: number;
+		completed_runs: number;
+		failed_runs: number;
+		total_items_scraped: number;
+		total_items_failed: number;
+		avg_duration_seconds: number | null;
+		last_run_at: string | null;
+	}
+
+	async function loadStats() {
+		try {
+			const res = await authFetch('/api/scraping-runs/stats?days=30');
+			if (!res.ok) throw new Error('Error al cargar estadísticas');
+
+			const stats: Stats = await res.json();
+			renderStats(stats);
+		} catch (error) {
+			console.error('Error loading stats:', error);
+		}
+	}
+
+	function renderStats(stats: Stats) {
+		const container = document.getElementById('stats-container');
+		if (!container) return;
+
+		const successRate = stats.total_runs > 0
+			? Math.round((stats.completed_runs / stats.total_runs) * 100)
+			: 0;
+
+		container.innerHTML = `
+			<div class="stat-card stat-primary">
+				<div class="stat-header">
+					<div class="stat-icon-wrapper">
+						<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+							<path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+						</svg>
+					</div>
+					<span class="stat-trend">30 días</span>
+				</div>
+				<div class="stat-value">${stats.total_runs}</div>
+				<div class="stat-label">Ejecuciones totales</div>
+			</div>
+			<div class="stat-card stat-success">
+				<div class="stat-header">
+					<div class="stat-icon-wrapper">
+						<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+							<polyline points="20 6 9 17 4 12"></polyline>
+						</svg>
+					</div>
+					<span class="stat-trend">${successRate}%</span>
+				</div>
+				<div class="stat-value">${stats.completed_runs}</div>
+				<div class="stat-label">Completadas</div>
+			</div>
+			<div class="stat-card stat-info">
+				<div class="stat-header">
+					<div class="stat-icon-wrapper">
+						<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+							<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+							<polyline points="14 2 14 8 20 8"></polyline>
+						</svg>
+					</div>
+					<span class="stat-trend">Total</span>
+				</div>
+				<div class="stat-value">${stats.total_items_scraped.toLocaleString('es-AR')}</div>
+				<div class="stat-label">Items scrapeados</div>
+			</div>
+			${stats.failed_runs > 0 ? `
+				<div class="stat-card stat-warning">
+					<div class="stat-header">
+						<div class="stat-icon-wrapper">
+							<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+								<path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+								<line x1="12" y1="9" x2="12" y2="13"></line>
+								<line x1="12" y1="17" x2="12.01" y2="17"></line>
+							</svg>
+						</div>
+						<span class="stat-trend">Errores</span>
+					</div>
+					<div class="stat-value">${stats.failed_runs}</div>
+					<div class="stat-label">Fallidas</div>
+				</div>
+			` : ''}
+		`;
+	}
+
+	async function loadRuns() {
+		const container = document.getElementById('runs-container');
+		const metaContainer = document.getElementById('runs-meta');
+		if (!container) return;
+
+		container.innerHTML = '<div class="loading">Cargando...</div>';
+
+		try {
+			// Build query params
+			const params = new URLSearchParams({
+				offset: (currentPage * limit).toString(),
+				limit: limit.toString()
+			});
+
+			if (currentFilter) params.append('status', currentFilter);
+			if (dateFrom) params.append('date_from', dateFrom);
+			if (dateTo) params.append('date_to', dateTo);
+			if (sourceFilter) params.append('source_id', sourceFilter);
+
+			const res = await authFetch(`/api/scraping-runs?${params.toString()}`);
+			if (!res.ok) throw new Error('Error al cargar ejecuciones');
+
+			const data = await res.json();
+			renderRuns(data.runs, data.total);
+
+			if (metaContainer) {
+				metaContainer.innerHTML = `<span class="meta-badge">${data.total} ejecuciones</span>`;
+			}
+
+			renderPagination(data.total);
+		} catch (error) {
+			console.error('Error loading runs:', error);
+			container.innerHTML = '<div class="error">Error al cargar ejecuciones</div>';
+		}
+	}
+
+	function renderRuns(runs: ScrapingRun[], total: number) {
+		const container = document.getElementById('runs-container');
+		if (!container) return;
+
+		if (!runs || runs.length === 0) {
+			container.innerHTML = '<div class="info">No hay ejecuciones registradas</div>';
+			return;
+		}
+
+		const tableHTML = `
+			<table class="runs-table">
+				<thead>
+					<tr>
+						<th>Fecha/Hora</th>
+						<th>Estado</th>
+						<th>Tipo</th>
+						<th>Duración</th>
+						<th>Items</th>
+						<th>Fuentes</th>
+						<th>Acciones</th>
+					</tr>
+				</thead>
+				<tbody>
+					${runs.map(run => `
+						<tr class="run-row status-${run.status}">
+							<td class="run-date">
+								<div class="date-time">
+									<div class="date">${formatDate(run.started_at)}</div>
+									<div class="time">${formatTime(run.started_at)}</div>
+								</div>
+							</td>
+							<td>
+								<span class="status-badge status-${run.status}">
+									${getStatusIcon(run.status)}
+									${getStatusText(run.status)}
+								</span>
+							</td>
+							<td>
+								<span class="trigger-badge trigger-${run.triggered_by}">
+									${run.triggered_by === 'manual' ? '👤 Manual' : '🤖 Auto'}
+								</span>
+							</td>
+							<td class="run-duration">
+								${formatDuration(run.duration_seconds)}
+							</td>
+							<td class="run-items">
+								<div class="items-summary">
+									<span class="items-count">${run.items_scraped}</span>
+									${run.items_failed > 0 ? `<span class="items-failed">${run.items_failed} fallidos</span>` : ''}
+								</div>
+							</td>
+							<td class="run-sources">
+								${run.sources_processed ? run.sources_processed.length : 0}
+							</td>
+							<td class="run-actions">
+								<button class="btn-view-details" data-run-id="${run.id}" title="Ver detalles">
+									<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+										<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+										<circle cx="12" cy="12" r="3"></circle>
+									</svg>
+								</button>
+							</td>
+						</tr>
+					`).join('')}
+				</tbody>
+			</table>
+		`;
+
+		container.innerHTML = tableHTML;
+
+		// Add event listeners to view buttons
+		document.querySelectorAll('.btn-view-details').forEach(btn => {
+			btn.addEventListener('click', function(this: HTMLElement) {
+				const runId = this.dataset.runId;
+				if (runId) viewRunDetails(runId);
+			});
+		});
+	}
+
+	function renderPagination(total: number) {
+		const container = document.getElementById('pagination');
+		if (!container) return;
+
+		const totalPages = Math.ceil(total / limit);
+		if (totalPages <= 1) {
+			container.innerHTML = '';
+			return;
+		}
+
+		let paginationHTML = '<div class="pagination-buttons">';
+
+		// Previous button
+		paginationHTML += `<button class="btn-page" ${currentPage === 0 ? 'disabled' : ''} data-page="${currentPage - 1}">Anterior</button>`;
+
+		// Page numbers
+		for (let i = 0; i < totalPages; i++) {
+			if (i < 3 || i >= totalPages - 3 || Math.abs(i - currentPage) < 2) {
+				paginationHTML += `<button class="btn-page ${i === currentPage ? 'active' : ''}" data-page="${i}">${i + 1}</button>`;
+			} else if (i === 3 || i === totalPages - 4) {
+				paginationHTML += '<span class="pagination-ellipsis">...</span>';
+			}
+		}
+
+		// Next button
+		paginationHTML += `<button class="btn-page" ${currentPage >= totalPages - 1 ? 'disabled' : ''} data-page="${currentPage + 1}">Siguiente</button>`;
+		paginationHTML += '</div>';
+
+		container.innerHTML = paginationHTML;
+
+		// Add event listeners
+		document.querySelectorAll('.btn-page:not([disabled])').forEach(btn => {
+			btn.addEventListener('click', function(this: HTMLElement) {
+				const page = parseInt(this.dataset.page || '0');
+				currentPage = page;
+				loadRuns();
+			});
+		});
+	}
+
+	function formatDate(dateStr: string): string {
+		const date = new Date(dateStr);
+		return date.toLocaleDateString('es-AR', { day: '2-digit', month: 'short', year: 'numeric' });
+	}
+
+	function formatTime(dateStr: string): string {
+		const date = new Date(dateStr);
+		return date.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
+	}
+
+	function formatDuration(seconds: number | null): string {
+		if (!seconds) return '-';
+		const mins = Math.floor(seconds / 60);
+		const secs = seconds % 60;
+		return mins > 0 ? `${mins}m ${secs}s` : `${secs}s`;
+	}
+
+	function getStatusIcon(status: string): string {
+		const icons: Record<string, string> = {
+			running: '🔄',
+			completed: '✅',
+			failed: '❌',
+			cancelled: '⛔'
+		};
+		return icons[status] || '❓';
+	}
+
+	function getStatusText(status: string): string {
+		const texts: Record<string, string> = {
+			running: 'Ejecutando',
+			completed: 'Completado',
+			failed: 'Fallido',
+			cancelled: 'Cancelado'
+		};
+		return texts[status] || status;
+	}
+
+	async function viewRunDetails(runId: string) {
+		const modal = document.getElementById('details-modal');
+		const modalBody = document.getElementById('modal-body');
+		if (!modal || !modalBody) return;
+
+		// Show modal with loading state
+		modal.style.display = 'flex';
+		modalBody.innerHTML = '<div class="loading">Cargando detalles...</div>';
+
+		try {
+			// Load run details
+			const res = await authFetch(`/api/scraping-runs/${runId}`);
+			if (!res.ok) throw new Error('Error al cargar detalles');
+
+			const run: ScrapingRun = await res.json();
+
+			// Load source names if there are sources
+			let sourceNames: Record<string, string> = {};
+			if (run.sources_processed && run.sources_processed.length > 0) {
+				try {
+					const sourcesRes = await authFetch('/api/scraping-sources');
+					if (sourcesRes.ok) {
+						const sourcesData = await sourcesRes.json();
+						// sourcesData is directly an array, not { sources: [...] }
+						sourceNames = sourcesData.reduce((acc: Record<string, string>, source: any) => {
+							acc[source.id] = source.name;
+							return acc;
+						}, {});
+					}
+				} catch (error) {
+					console.error('Error loading sources:', error);
+				}
+			}
+
+			// Load items for this run
+			let items: any[] = [];
+			let itemsTotal = 0;
+			try {
+				const itemsRes = await authFetch(`/api/scraping-runs/${runId}/items?limit=10`);
+				if (itemsRes.ok) {
+					const itemsData = await itemsRes.json();
+					items = itemsData.items || [];
+					itemsTotal = itemsData.total || 0;
+				}
+			} catch (error) {
+				console.error('Error loading items:', error);
+			}
+
+			renderRunDetails(run, sourceNames, items, itemsTotal, runId);
+		} catch (error) {
+			console.error('Error loading run details:', error);
+			modalBody.innerHTML = '<div class="error">Error al cargar los detalles de la ejecución</div>';
+		}
+	}
+
+	function renderRunDetails(run: ScrapingRun, sourceNames: Record<string, string> = {}, items: any[] = [], itemsTotal: number = 0, runId: string = '') {
+		const modalBody = document.getElementById('modal-body');
+		if (!modalBody) return;
+
+		const duration = run.duration_seconds
+			? formatDuration(run.duration_seconds)
+			: (run.status === 'running' ? 'En curso...' : '-');
+
+		const startTime = new Date(run.started_at);
+		const endTime = run.finished_at ? new Date(run.finished_at) : null;
+
+		modalBody.innerHTML = `
+			<div class="details-grid">
+				<div class="detail-section">
+					<h4 class="detail-section-title">Información General</h4>
+					<div class="detail-rows">
+						<div class="detail-row">
+							<span class="detail-label">ID de Ejecución</span>
+							<span class="detail-value detail-value-mono">${run.id}</span>
+						</div>
+						<div class="detail-row">
+							<span class="detail-label">Estado</span>
+							<span class="status-badge status-${run.status}">
+								${getStatusIcon(run.status)}
+								${getStatusText(run.status)}
+							</span>
+						</div>
+						<div class="detail-row">
+							<span class="detail-label">Tipo de Ejecución</span>
+							<span class="trigger-badge trigger-${run.triggered_by}">
+								${run.triggered_by === 'manual' ? '👤 Manual' : '🤖 Automática'}
+							</span>
+						</div>
+					</div>
+				</div>
+
+				<div class="detail-section">
+					<h4 class="detail-section-title">Tiempo</h4>
+					<div class="detail-rows">
+						<div class="detail-row">
+							<span class="detail-label">Inicio</span>
+							<span class="detail-value">${startTime.toLocaleString('es-AR')}</span>
+						</div>
+						<div class="detail-row">
+							<span class="detail-label">Fin</span>
+							<span class="detail-value">${endTime ? endTime.toLocaleString('es-AR') : '-'}</span>
+						</div>
+						<div class="detail-row">
+							<span class="detail-label">Duración</span>
+							<span class="detail-value">${duration}</span>
+						</div>
+					</div>
+				</div>
+
+				<div class="detail-section">
+					<h4 class="detail-section-title">Resultados</h4>
+					<div class="detail-rows">
+						<div class="detail-row">
+							<span class="detail-label">Items Scrapeados</span>
+							<span class="detail-value detail-value-success">${run.items_scraped}</span>
+						</div>
+						<div class="detail-row">
+							<span class="detail-label">Items Fallidos</span>
+							<span class="detail-value ${run.items_failed > 0 ? 'detail-value-error' : ''}">${run.items_failed}</span>
+						</div>
+						<div class="detail-row">
+							<span class="detail-label">Items Duplicados</span>
+							<span class="detail-value detail-value-warning">${run.items_duplicate}</span>
+						</div>
+						<div class="detail-row">
+							<span class="detail-label">Fuentes Procesadas</span>
+							<span class="detail-value">${run.sources_processed ? run.sources_processed.length : 0}</span>
+						</div>
+					</div>
+				</div>
+
+				${run.sources_processed && run.sources_processed.length > 0 ? `
+					<div class="detail-section detail-section-full">
+						<h4 class="detail-section-title">Fuentes</h4>
+						<div class="sources-list">
+							${run.sources_processed.map(sourceId => {
+								const sourceName = sourceNames[sourceId] || sourceId;
+								return `<span class="source-badge" title="${sourceId}">${sourceName}</span>`;
+							}).join('')}
+						</div>
+					</div>
+				` : ''}
+
+				${items.length > 0 ? `
+					<div class="detail-section detail-section-full">
+						<div class="detail-section-header">
+							<h4 class="detail-section-title">Items Scrapeados (${itemsTotal})</h4>
+							<a href="/admin/scraping?run_id=${runId}" class="btn-view-all" target="_blank">Ver todos →</a>
+						</div>
+						<div class="items-preview">
+							${items.slice(0, 5).map((item: any) => `
+								<div class="item-preview">
+									<div class="item-preview-title">${item.title || 'Sin título'}</div>
+									<div class="item-preview-meta">
+										<span class="item-preview-source">${sourceNames[item.source_id] || item.source_id}</span>
+										<span class="item-preview-status status-${item.status}">${item.status}</span>
+									</div>
+								</div>
+							`).join('')}
+							${itemsTotal > 5 ? `
+								<div class="items-preview-more">
+									<a href="/admin/scraping?run_id=${runId}" target="_blank">Ver ${itemsTotal - 5} items más →</a>
+								</div>
+							` : ''}
+						</div>
+					</div>
+				` : ''}
+
+				${run.error_message ? `
+					<div class="detail-section detail-section-full">
+						<h4 class="detail-section-title">Error</h4>
+						<div class="error-message">${run.error_message}</div>
+					</div>
+				` : ''}
+
+				${run.errors && run.errors.length > 0 ? `
+					<div class="detail-section detail-section-full">
+						<h4 class="detail-section-title">Errores Detallados</h4>
+						<div class="errors-list">
+							${run.errors.map((error: any) =>
+								`<div class="error-item">${JSON.stringify(error)}</div>`
+							).join('')}
+						</div>
+					</div>
+				` : ''}
+			</div>
+		`;
+	}
+
+	function closeModal() {
+		const modal = document.getElementById('details-modal');
+		if (modal) modal.style.display = 'none';
+	}
+
+	async function loadSources() {
+		try {
+			const res = await authFetch('/api/scraping-sources');
+			if (!res.ok) return;
+
+			const sources = await res.json();
+			const sourceSelect = document.getElementById('source-filter') as HTMLSelectElement;
+			if (!sourceSelect) return;
+
+			// Add source options
+			sources.forEach((source: any) => {
+				const option = document.createElement('option');
+				option.value = source.id;
+				option.textContent = source.name;
+				sourceSelect.appendChild(option);
+			});
+		} catch (error) {
+			console.error('Error loading sources:', error);
+		}
+	}
+
+	// Event listeners
+	document.addEventListener('DOMContentLoaded', () => {
+		loadStats();
+		loadRuns();
+		loadSources();
+
+		const refreshBtn = document.getElementById('btn-refresh');
+		if (refreshBtn) {
+			refreshBtn.addEventListener('click', () => {
+				refreshBtn.classList.add('spinning');
+				Promise.all([loadStats(), loadRuns()]).finally(() => {
+					setTimeout(() => {
+						refreshBtn.classList.remove('spinning');
+					}, 600);
+				});
+			});
+		}
+
+		const statusFilter = document.getElementById('status-filter') as HTMLSelectElement;
+		if (statusFilter) {
+			statusFilter.addEventListener('change', () => {
+				currentFilter = statusFilter.value;
+				currentPage = 0;
+				loadRuns();
+			});
+		}
+
+		const sourceFilterElem = document.getElementById('source-filter') as HTMLSelectElement;
+		if (sourceFilterElem) {
+			sourceFilterElem.addEventListener('change', () => {
+				sourceFilter = sourceFilterElem.value;
+				currentPage = 0;
+				loadRuns();
+			});
+		}
+
+		const dateFromElem = document.getElementById('date-from') as HTMLInputElement;
+		if (dateFromElem) {
+			dateFromElem.addEventListener('change', () => {
+				dateFrom = dateFromElem.value;
+				currentPage = 0;
+				loadRuns();
+			});
+		}
+
+		const dateToElem = document.getElementById('date-to') as HTMLInputElement;
+		if (dateToElem) {
+			dateToElem.addEventListener('change', () => {
+				dateTo = dateToElem.value;
+				currentPage = 0;
+				loadRuns();
+			});
+		}
+
+		const clearFiltersBtn = document.getElementById('btn-clear-filters');
+		if (clearFiltersBtn) {
+			clearFiltersBtn.addEventListener('click', () => {
+				currentFilter = '';
+				sourceFilter = '';
+				dateFrom = '';
+				dateTo = '';
+				currentPage = 0;
+				if (statusFilter) statusFilter.value = '';
+				if (sourceFilterElem) sourceFilterElem.value = '';
+				if (dateFromElem) dateFromElem.value = '';
+				if (dateToElem) dateToElem.value = '';
+				loadRuns();
+			});
+		}
+
+		// Modal close handlers
+		const modalClose = document.getElementById('modal-close');
+		const modalOverlay = document.getElementById('modal-overlay');
+		if (modalClose) modalClose.addEventListener('click', closeModal);
+		if (modalOverlay) modalOverlay.addEventListener('click', closeModal);
+
+		// ESC key to close modal
+		document.addEventListener('keydown', (e) => {
+			if (e.key === 'Escape') closeModal();
+		});
+	});
+</script>
+
+<style is:global>
+	/* Reuse styles from fuentes.astro with modifications */
+
+	.history-admin {
+		max-width: 1440px;
+		margin: 0 auto;
+		padding: 20px;
+	}
+
+	/* Hero Header - Same as fuentes */
+	.hero-header {
+		background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+		border-radius: 16px;
+		padding: 24px 32px;
+		margin-bottom: 20px;
+		color: white;
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		box-shadow: 0 10px 40px rgba(102, 126, 234, 0.3);
+		position: relative;
+		overflow: hidden;
+	}
+
+	.hero-header::before {
+		content: '';
+		position: absolute;
+		top: -50%;
+		right: -10%;
+		width: 500px;
+		height: 500px;
+		background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);
+		border-radius: 50%;
+	}
+
+	.hero-content {
+		position: relative;
+		z-index: 1;
+	}
+
+	.hero-badge {
+		display: inline-block;
+		background: rgba(255, 255, 255, 0.2);
+		padding: 6px 14px;
+		border-radius: 20px;
+		font-size: 0.75rem;
+		font-weight: 600;
+		text-transform: uppercase;
+		letter-spacing: 0.05em;
+		margin-bottom: 12px;
+		backdrop-filter: blur(10px);
+	}
+
+	.hero-title {
+		font-size: 1.875rem;
+		font-weight: 800;
+		margin: 0 0 4px;
+		letter-spacing: -0.03em;
+		text-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+	}
+
+	.hero-subtitle {
+		font-size: 0.9375rem;
+		opacity: 0.95;
+		margin: 0;
+		font-weight: 400;
+	}
+
+	.hero-actions {
+		position: relative;
+		z-index: 1;
+	}
+
+	.btn-refresh {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		padding: 12px 24px;
+		background: rgba(255, 255, 255, 0.95);
+		color: #667eea;
+		border: none;
+		border-radius: 12px;
+		font-weight: 600;
+		font-size: 0.9375rem;
+		cursor: pointer;
+		transition: all 0.3s ease;
+		box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
+	}
+
+	.btn-refresh:hover {
+		background: white;
+		transform: translateY(-2px);
+		box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);
+	}
+
+	@keyframes spin {
+		from { transform: rotate(0deg); }
+		to { transform: rotate(360deg); }
+	}
+
+	.btn-refresh.spinning svg {
+		animation: spin 0.6s linear;
+	}
+
+	/* Stats Grid - Same as fuentes */
+	.stats-grid {
+		display: grid;
+		grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+		gap: 16px;
+		margin-bottom: 20px;
+	}
+
+	.stat-card {
+		background: white;
+		border-radius: 12px;
+		padding: 18px;
+		box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+		transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+		border: 1px solid #f0f0f0;
+		position: relative;
+		overflow: hidden;
+	}
+
+	.stat-card::before {
+		content: '';
+		position: absolute;
+		top: 0;
+		left: 0;
+		right: 0;
+		height: 3px;
+		background: linear-gradient(90deg, #3b82f6, #8b5cf6);
+		opacity: 0;
+		transition: opacity 0.3s ease;
+	}
+
+	.stat-card.stat-primary::before { background: linear-gradient(90deg, #3b82f6, #2563eb); }
+	.stat-card.stat-success::before { background: linear-gradient(90deg, #10b981, #059669); }
+	.stat-card.stat-info::before { background: linear-gradient(90deg, #8b5cf6, #7c3aed); }
+	.stat-card.stat-warning::before { background: linear-gradient(90deg, #f59e0b, #ef4444); }
+
+	.stat-card:hover {
+		transform: translateY(-4px);
+		box-shadow: 0 12px 28px rgba(0, 0, 0, 0.12);
+		border-color: transparent;
+	}
+
+	.stat-card:hover::before {
+		opacity: 1;
+	}
+
+	.stat-header {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		margin-bottom: 12px;
+	}
+
+	.stat-icon-wrapper {
+		width: 40px;
+		height: 40px;
+		border-radius: 10px;
+		background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		color: #3b82f6;
+	}
+
+	.stat-success .stat-icon-wrapper {
+		background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+		color: #10b981;
+	}
+
+	.stat-info .stat-icon-wrapper {
+		background: linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%);
+		color: #8b5cf6;
+	}
+
+	.stat-warning .stat-icon-wrapper {
+		background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+		color: #f59e0b;
+	}
+
+	.stat-trend {
+		font-size: 0.75rem;
+		font-weight: 600;
+		padding: 4px 10px;
+		border-radius: 12px;
+		background: #f3f4f6;
+		color: #6b7280;
+	}
+
+	.stat-value {
+		font-size: 1.75rem;
+		font-weight: 800;
+		color: #1a1a1a;
+		line-height: 1;
+		margin-bottom: 4px;
+		letter-spacing: -0.02em;
+	}
+
+	.stat-label {
+		font-size: 0.8125rem;
+		color: #6b7280;
+		font-weight: 500;
+	}
+
+	/* Filters Section */
+	.filters-section {
+		background: white;
+		border-radius: 12px;
+		padding: 16px 20px;
+		margin-bottom: 20px;
+		box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+		display: flex;
+		gap: 16px;
+		align-items: flex-end;
+	}
+
+	.filter-group {
+		display: flex;
+		flex-direction: column;
+		gap: 6px;
+	}
+
+	.filter-group label {
+		font-size: 0.875rem;
+		font-weight: 600;
+		color: #374151;
+	}
+
+	.filter-select {
+		padding: 8px 12px;
+		border: 1px solid #e5e7eb;
+		border-radius: 8px;
+		font-size: 0.875rem;
+		min-width: 150px;
+		background: white;
+		cursor: pointer;
+	}
+
+	.filter-select:focus {
+		outline: none;
+		border-color: #667eea;
+	}
+
+	.filter-input {
+		padding: 8px 12px;
+		border: 1px solid #e5e7eb;
+		border-radius: 8px;
+		font-size: 0.875rem;
+		min-width: 150px;
+		background: white;
+		font-family: inherit;
+	}
+
+	.filter-input:focus {
+		outline: none;
+		border-color: #667eea;
+	}
+
+	.btn-clear-filters {
+		padding: 8px 16px;
+		background: #f3f4f6;
+		border: 1px solid #e5e7eb;
+		border-radius: 8px;
+		font-size: 0.875rem;
+		font-weight: 500;
+		cursor: pointer;
+		transition: all 0.2s ease;
+	}
+
+	.btn-clear-filters:hover {
+		background: #e5e7eb;
+	}
+
+	/* Runs Section */
+	.runs-section {
+		background: white;
+		border-radius: 16px;
+		padding: 24px;
+		box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+		border: 1px solid #f0f0f0;
+	}
+
+	.section-header {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		margin-bottom: 20px;
+		padding-bottom: 12px;
+		border-bottom: 2px solid #f3f4f6;
+	}
+
+	.section-title {
+		font-size: 1.25rem;
+		font-weight: 700;
+		color: #1a1a1a;
+		margin: 0;
+	}
+
+	.meta-badge {
+		font-size: 0.8125rem;
+		font-weight: 600;
+		padding: 6px 14px;
+		background: #f3f4f6;
+		color: #6b7280;
+		border-radius: 10px;
+	}
+
+	/* Runs Table */
+	.runs-table-wrapper {
+		overflow-x: auto;
+	}
+
+	.runs-table {
+		width: 100%;
+		border-collapse: collapse;
+		font-size: 0.875rem;
+	}
+
+	.runs-table thead {
+		background: #f9fafb;
+		border-bottom: 2px solid #e5e7eb;
+	}
+
+	.runs-table th {
+		padding: 12px 16px;
+		text-align: left;
+		font-weight: 600;
+		color: #374151;
+		font-size: 0.8125rem;
+		text-transform: uppercase;
+		letter-spacing: 0.03em;
+	}
+
+	.runs-table tbody tr {
+		border-bottom: 1px solid #f3f4f6;
+		transition: background 0.15s ease;
+	}
+
+	.runs-table tbody tr:hover {
+		background: #f9fafb;
+	}
+
+	.runs-table td {
+		padding: 14px 16px;
+	}
+
+	.date-time {
+		display: flex;
+		flex-direction: column;
+		gap: 2px;
+	}
+
+	.date {
+		font-weight: 600;
+		color: #1f2937;
+	}
+
+	.time {
+		font-size: 0.75rem;
+		color: #9ca3af;
+	}
+
+	.status-badge {
+		display: inline-flex;
+		align-items: center;
+		gap: 6px;
+		padding: 5px 12px;
+		border-radius: 12px;
+		font-size: 0.75rem;
+		font-weight: 600;
+		white-space: nowrap;
+	}
+
+	.status-badge.status-running {
+		background: linear-gradient(135deg, #dbeafe, #bfdbfe);
+		color: #1e40af;
+	}
+
+	.status-badge.status-completed {
+		background: linear-gradient(135deg, #d1fae5, #a7f3d0);
+		color: #047857;
+	}
+
+	.status-badge.status-failed {
+		background: linear-gradient(135deg, #fecaca, #fca5a5);
+		color: #b91c1c;
+	}
+
+	.status-badge.status-cancelled {
+		background: #f3f4f6;
+		color: #6b7280;
+	}
+
+	.trigger-badge {
+		display: inline-flex;
+		align-items: center;
+		gap: 4px;
+		padding: 4px 10px;
+		border-radius: 10px;
+		font-size: 0.75rem;
+		font-weight: 500;
+		background: #f3f4f6;
+		color: #6b7280;
+	}
+
+	.items-summary {
+		display: flex;
+		flex-direction: column;
+		gap: 2px;
+	}
+
+	.items-count {
+		font-weight: 700;
+		color: #1f2937;
+	}
+
+	.items-failed {
+		font-size: 0.75rem;
+		color: #ef4444;
+	}
+
+	.run-duration {
+		font-variant-numeric: tabular-nums;
+		color: #6b7280;
+	}
+
+	.btn-view-details {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		padding: 6px;
+		background: #f3f4f6;
+		border: 1px solid #e5e7eb;
+		border-radius: 6px;
+		cursor: pointer;
+		transition: all 0.2s ease;
+		color: #667eea;
+	}
+
+	.btn-view-details:hover {
+		background: #667eea;
+		color: white;
+		border-color: #667eea;
+	}
+
+	/* Pagination */
+	.pagination {
+		margin-top: 24px;
+		display: flex;
+		justify-content: center;
+	}
+
+	.pagination-buttons {
+		display: flex;
+		gap: 8px;
+		align-items: center;
+	}
+
+	.btn-page {
+		padding: 8px 12px;
+		background: white;
+		border: 1px solid #e5e7eb;
+		border-radius: 6px;
+		font-size: 0.875rem;
+		font-weight: 500;
+		cursor: pointer;
+		transition: all 0.2s ease;
+		color: #374151;
+	}
+
+	.btn-page:hover:not([disabled]) {
+		background: #f9fafb;
+		border-color: #667eea;
+		color: #667eea;
+	}
+
+	.btn-page.active {
+		background: #667eea;
+		color: white;
+		border-color: #667eea;
+	}
+
+	.btn-page[disabled] {
+		opacity: 0.5;
+		cursor: not-allowed;
+	}
+
+	.pagination-ellipsis {
+		color: #9ca3af;
+		padding: 0 4px;
+	}
+
+	/* Loading shimmer */
+	@keyframes shimmer {
+		0% { background-position: -1000px 0; }
+		100% { background-position: 1000px 0; }
+	}
+
+	.loading-shimmer {
+		background: linear-gradient(90deg, #f3f4f6 25%, #e5e7eb 50%, #f3f4f6 75%);
+		background-size: 1000px 100%;
+		animation: shimmer 2s infinite;
+		border-radius: 12px;
+		height: 90px;
+	}
+
+	.loading, .error, .info {
+		text-align: center;
+		padding: 60px 20px;
+		color: #9ca3af;
+		font-size: 1rem;
+	}
+
+	.error {
+		color: #ef4444;
+	}
+
+	/* Modal */
+	.modal {
+		position: fixed;
+		top: 0;
+		left: 0;
+		right: 0;
+		bottom: 0;
+		z-index: 1000;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		padding: 20px;
+	}
+
+	.modal-overlay {
+		position: absolute;
+		top: 0;
+		left: 0;
+		right: 0;
+		bottom: 0;
+		background: rgba(0, 0, 0, 0.5);
+		backdrop-filter: blur(4px);
+	}
+
+	.modal-content {
+		position: relative;
+		background: white;
+		border-radius: 16px;
+		max-width: 800px;
+		width: 100%;
+		max-height: 90vh;
+		overflow-y: auto;
+		box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+		animation: modalSlideIn 0.3s ease;
+	}
+
+	@keyframes modalSlideIn {
+		from {
+			opacity: 0;
+			transform: translateY(-20px) scale(0.95);
+		}
+		to {
+			opacity: 1;
+			transform: translateY(0) scale(1);
+		}
+	}
+
+	.modal-header {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		padding: 24px;
+		border-bottom: 2px solid #f3f4f6;
+	}
+
+	.modal-header h3 {
+		margin: 0;
+		font-size: 1.5rem;
+		font-weight: 700;
+		color: #1a1a1a;
+	}
+
+	.modal-close {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		width: 32px;
+		height: 32px;
+		background: #f3f4f6;
+		border: none;
+		border-radius: 8px;
+		cursor: pointer;
+		transition: all 0.2s ease;
+		color: #6b7280;
+	}
+
+	.modal-close:hover {
+		background: #e5e7eb;
+		color: #374151;
+	}
+
+	.modal-body {
+		padding: 24px;
+	}
+
+	.details-grid {
+		display: grid;
+		grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+		gap: 20px;
+	}
+
+	.detail-section {
+		background: #f9fafb;
+		border-radius: 12px;
+		padding: 16px;
+		border: 1px solid #e5e7eb;
+	}
+
+	.detail-section-full {
+		grid-column: 1 / -1;
+	}
+
+	.detail-section-title {
+		margin: 0 0 12px;
+		font-size: 0.875rem;
+		font-weight: 700;
+		color: #374151;
+		text-transform: uppercase;
+		letter-spacing: 0.05em;
+	}
+
+	.detail-rows {
+		display: flex;
+		flex-direction: column;
+		gap: 10px;
+	}
+
+	.detail-row {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		gap: 12px;
+	}
+
+	.detail-label {
+		font-size: 0.875rem;
+		color: #6b7280;
+		font-weight: 500;
+	}
+
+	.detail-value {
+		font-size: 0.875rem;
+		color: #1f2937;
+		font-weight: 600;
+		text-align: right;
+	}
+
+	.detail-value-mono {
+		font-family: 'Courier New', monospace;
+		font-size: 0.75rem;
+		word-break: break-all;
+	}
+
+	.detail-value-success {
+		color: #10b981;
+	}
+
+	.detail-value-error {
+		color: #ef4444;
+	}
+
+	.detail-value-warning {
+		color: #f59e0b;
+	}
+
+	.sources-list {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 8px;
+	}
+
+	.source-badge {
+		padding: 6px 12px;
+		background: white;
+		border: 1px solid #e5e7eb;
+		border-radius: 8px;
+		font-size: 0.75rem;
+		font-weight: 500;
+		color: #374151;
+	}
+
+	.detail-section-header {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		margin-bottom: 12px;
+	}
+
+	.btn-view-all {
+		font-size: 0.75rem;
+		color: #667eea;
+		text-decoration: none;
+		font-weight: 600;
+		transition: color 0.2s ease;
+	}
+
+	.btn-view-all:hover {
+		color: #5568d3;
+	}
+
+	.items-preview {
+		display: flex;
+		flex-direction: column;
+		gap: 8px;
+	}
+
+	.item-preview {
+		background: white;
+		border: 1px solid #e5e7eb;
+		border-radius: 8px;
+		padding: 12px;
+		transition: all 0.2s ease;
+	}
+
+	.item-preview:hover {
+		border-color: #667eea;
+		box-shadow: 0 2px 8px rgba(102, 126, 234, 0.1);
+	}
+
+	.item-preview-title {
+		font-size: 0.875rem;
+		font-weight: 600;
+		color: #1f2937;
+		margin-bottom: 6px;
+		display: -webkit-box;
+		-webkit-line-clamp: 2;
+		-webkit-box-orient: vertical;
+		overflow: hidden;
+	}
+
+	.item-preview-meta {
+		display: flex;
+		gap: 8px;
+		align-items: center;
+		flex-wrap: wrap;
+	}
+
+	.item-preview-source {
+		font-size: 0.75rem;
+		color: #6b7280;
+	}
+
+	.item-preview-status {
+		font-size: 0.625rem;
+		padding: 2px 8px;
+		border-radius: 10px;
+		font-weight: 600;
+		text-transform: uppercase;
+	}
+
+	.item-preview-status.status-scraped {
+		background: #dbeafe;
+		color: #1e40af;
+	}
+
+	.item-preview-status.status-ready {
+		background: #d1fae5;
+		color: #047857;
+	}
+
+	.item-preview-status.status-published {
+		background: #dcfce7;
+		color: #16a34a;
+	}
+
+	.items-preview-more {
+		text-align: center;
+		padding: 8px;
+	}
+
+	.items-preview-more a {
+		font-size: 0.875rem;
+		color: #667eea;
+		text-decoration: none;
+		font-weight: 500;
+	}
+
+	.items-preview-more a:hover {
+		color: #5568d3;
+		text-decoration: underline;
+	}
+
+	.error-message {
+		background: #fef2f2;
+		border: 1px solid #fecaca;
+		border-radius: 8px;
+		padding: 12px;
+		color: #991b1b;
+		font-size: 0.875rem;
+		font-family: 'Courier New', monospace;
+	}
+
+	.errors-list {
+		display: flex;
+		flex-direction: column;
+		gap: 8px;
+	}
+
+	.error-item {
+		background: #fef2f2;
+		border: 1px solid #fecaca;
+		border-radius: 8px;
+		padding: 10px;
+		color: #991b1b;
+		font-size: 0.75rem;
+		font-family: 'Courier New', monospace;
+		overflow-x: auto;
+	}
+
+	/* Responsive */
+	@media (max-width: 768px) {
+		.history-admin {
+			padding: 12px;
+		}
+
+		.hero-header {
+			flex-direction: column;
+			align-items: flex-start;
+			padding: 20px;
+		}
+
+		.hero-actions {
+			width: 100%;
+			margin-top: 16px;
+		}
+
+		.btn-refresh {
+			width: 100%;
+			justify-content: center;
+		}
+
+		.stats-grid {
+			grid-template-columns: 1fr;
+		}
+
+		.filters-section {
+			flex-direction: column;
+			align-items: stretch;
+		}
+
+		.runs-table {
+			font-size: 0.75rem;
+		}
+
+		.runs-table th,
+		.runs-table td {
+			padding: 8px 10px;
+		}
+
+		.modal-content {
+			max-width: 100%;
+			max-height: 100vh;
+			border-radius: 0;
+		}
+
+		.details-grid {
+			grid-template-columns: 1fr;
+		}
+
+		.detail-row {
+			flex-direction: column;
+			align-items: flex-start;
+		}
+
+		.detail-value {
+			text-align: left;
+		}
+	}
+</style>

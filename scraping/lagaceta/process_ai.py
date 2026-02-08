@@ -185,7 +185,17 @@ async def process_item_with_ai(item: dict, custom_prompt: str | None = None) -> 
         print(f"[ERROR] Failed to parse AI response as JSON: {e}")
         return None
     except Exception as e:
-        print(f"[ERROR] AI processing failed: {e}")
+        error_type = type(e).__name__
+        error_msg = str(e)
+        # Check for common OpenAI errors
+        if "rate_limit" in error_msg.lower() or "429" in error_msg:
+            print(f"[ERROR] OpenAI rate limit exceeded: {error_msg}")
+        elif "timeout" in error_msg.lower():
+            print(f"[ERROR] OpenAI timeout: {error_msg}")
+        elif "api_key" in error_msg.lower():
+            print(f"[ERROR] OpenAI API key issue: {error_msg}")
+        else:
+            print(f"[ERROR] AI processing failed ({error_type}): {error_msg}")
         return None
 
 
@@ -358,8 +368,8 @@ async def get_items_to_process(conn, limit: int = 20):
     return [dict(row) for row in rows]
 
 
-async def process_single_item(conn, item: dict, index: int, total: int):
-    """Process a single item"""
+async def process_single_item(conn, item: dict, index: int, total: int) -> dict:
+    """Process a single item. Returns dict with success status and item_id."""
 
     item_id = str(item['id'])
     title = item.get('title', 'Sin título')[:60]
@@ -391,7 +401,7 @@ async def process_single_item(conn, item: dict, index: int, total: int):
             """,
             item_id
         )
-        return False
+        return {"success": False, "item_id": item_id, "error": "AI processing failed"}
 
     # Generate image if content is valid
     if ai_data["is_valid"] and GENERATE_IMAGES:
@@ -438,10 +448,10 @@ async def process_single_item(conn, item: dict, index: int, total: int):
             print(f"    [OK] Tokens: {ai_data['ai_tokens_used']}, Total Cost: ${ai_data['ai_cost_usd']:.6f}")
         else:
             print(f"    [DISCARD] Reason: {ai_data['ai_metadata'].get('validation_reason')}")
-        return True
+        return {"success": True, "item_id": item_id}
     else:
         print(f"    [ERROR] Failed to update database")
-        return False
+        return {"success": False, "item_id": item_id, "error": "Failed to update database"}
 
 
 async def main():
@@ -465,11 +475,11 @@ async def main():
         print("Please set it before running this script.")
         return
 
-    # Connect to database
+    # Connect to database using pool for concurrent operations
     print("\n[DB] Connecting to PostgreSQL...")
     try:
-        conn = await asyncpg.connect(**DB_CONFIG)
-        print("[DB] Connected successfully")
+        pool = await asyncpg.create_pool(**DB_CONFIG, min_size=CONCURRENCY, max_size=CONCURRENCY + 2)
+        print("[DB] Connection pool created successfully")
     except Exception as e:
         print(f"[ERROR] Failed to connect to database: {e}")
         return
@@ -477,7 +487,8 @@ async def main():
     try:
         # Get items to process
         print("\n[FETCH] Getting items to process...")
-        items = await get_items_to_process(conn, limit=50)
+        async with pool.acquire() as conn:
+            items = await get_items_to_process(conn, limit=50)
 
         if not items:
             print("[INFO] No items to process")
@@ -490,23 +501,50 @@ async def main():
         successful = 0
         failed = 0
 
-        # Process in batches
+        # Process in batches - each task gets its own connection from pool
         for i in range(0, total, CONCURRENCY):
             batch = items[i:i + CONCURRENCY]
+            batch_item_ids = [str(item['id']) for item in batch]
+
+            async def process_with_pool_conn(item, index, total):
+                async with pool.acquire() as conn:
+                    return await process_single_item(conn, item, index, total)
+
             tasks = [
-                process_single_item(conn, item, i + j + 1, total)
+                process_with_pool_conn(item, i + j + 1, total)
                 for j, item in enumerate(batch)
             ]
 
             results = await asyncio.gather(*tasks, return_exceptions=True)
 
-            for result in results:
+            for idx, result in enumerate(results):
+                item_id = batch_item_ids[idx]
                 if isinstance(result, Exception):
+                    # Log the actual exception
+                    error_msg = str(result)[:500]
+                    print(f"    [EXCEPTION] Item {item_id[:8]}...: {error_msg}")
                     failed += 1
-                elif result:
+                    # Update the item in database with the error
+                    try:
+                        async with pool.acquire() as conn:
+                            await conn.execute(
+                                """
+                                UPDATE scraping_items
+                                SET retry_count = retry_count + 1,
+                                    last_error = $1,
+                                    last_error_at = NOW()
+                                WHERE id = $2
+                                """,
+                                f"Exception: {error_msg}",
+                                item_id
+                            )
+                    except Exception as db_err:
+                        print(f"    [ERROR] Failed to update error in DB: {db_err}")
+                elif isinstance(result, dict) and result.get("success"):
                     successful += 1
                 else:
                     failed += 1
+                    # If result is a dict with error info, it was already logged/updated in process_single_item
 
             # Small delay between batches
             if i + CONCURRENCY < total:
@@ -521,18 +559,18 @@ async def main():
         print(f"Failed: {failed}")
 
         # Get stats
-        stats = await conn.fetchrow(
-            """
-            SELECT
-                COUNT(*) FILTER (WHERE status = 'ai_completed') as completed,
-                COUNT(*) FILTER (WHERE status = 'discarded') as discarded,
-                COALESCE(SUM(ai_tokens_used), 0) as total_tokens,
-                COALESCE(SUM(ai_cost_usd), 0) as total_cost
-            FROM scraping_items
-            WHERE source_media = 'lagaceta'
-              AND ai_processed_at >= NOW() - INTERVAL '1 hour'
-            """
-        )
+        async with pool.acquire() as conn:
+            stats = await conn.fetchrow(
+                """
+                SELECT
+                    COUNT(*) FILTER (WHERE status = 'ai_completed') as completed,
+                    COUNT(*) FILTER (WHERE status = 'discarded') as discarded,
+                    COALESCE(SUM(ai_tokens_used), 0) as total_tokens,
+                    COALESCE(SUM(ai_cost_usd), 0) as total_cost
+                FROM scraping_items
+                WHERE ai_processed_at >= NOW() - INTERVAL '1 hour'
+                """
+            )
 
         print(f"\nRecent AI Stats (last hour):")
         print(f"  Completed: {stats['completed']}")
@@ -540,9 +578,15 @@ async def main():
         print(f"  Total tokens: {stats['total_tokens']}")
         print(f"  Total cost: ${stats['total_cost']:.6f}")
 
+        return {
+            "processed": successful,
+            "failed": failed,
+            "total": total
+        }
+
     finally:
-        await conn.close()
-        print("\n[DB] Connection closed")
+        await pool.close()
+        print("\n[DB] Connection pool closed")
 
 
 if __name__ == "__main__":

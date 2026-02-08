@@ -94,13 +94,9 @@ export async function authFetch(path: string, options: RequestInit = {}): Promis
 
   const makeRequest = async (accessToken: string | null) => {
     const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
       ...(options.headers as Record<string, string> || {}),
     };
-
-    // Only set content-type if not already provided
-    if (!headers['Content-Type'] && !headers['content-type']) {
-      headers['Content-Type'] = 'application/json';
-    }
 
     if (accessToken) {
       headers['Authorization'] = `Bearer ${accessToken}`;

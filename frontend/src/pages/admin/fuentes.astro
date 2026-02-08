@@ -1,0 +1,1006 @@
+---
+import AdminLayout from '../../layouts/AdminLayout.astro';
+
+const title = 'Gestión de Fuentes';
+---
+
+<AdminLayout title={title}>
+	<div class="sources-admin">
+		<!-- Hero Header -->
+		<div class="hero-header">
+			<div class="hero-content">
+				<div class="hero-badge">Administración</div>
+				<h1 class="hero-title">Fuentes de Scraping</h1>
+				<p class="hero-subtitle">Gestiona y monitorea todas las fuentes de contenido del sistema</p>
+			</div>
+			<div class="hero-actions">
+				<button class="btn-refresh" id="btn-refresh" title="Recargar">
+					<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+						<path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/>
+					</svg>
+					Actualizar
+				</button>
+			</div>
+		</div>
+
+		<!-- Estadísticas -->
+		<div id="stats-container" class="stats-grid">
+			<div class="loading-shimmer"></div>
+			<div class="loading-shimmer"></div>
+			<div class="loading-shimmer"></div>
+			<div class="loading-shimmer"></div>
+		</div>
+
+		<!-- Lista de Fuentes -->
+		<section class="sources-section">
+			<div class="section-header">
+				<h2 class="section-title">Fuentes disponibles</h2>
+				<div class="section-meta" id="sources-meta">
+					<span class="meta-badge">Cargando...</span>
+				</div>
+			</div>
+			<div id="sources-container" class="sources-list">
+				<div class="loading-shimmer" style="height: 200px;"></div>
+				<div class="loading-shimmer" style="height: 200px;"></div>
+			</div>
+		</section>
+	</div>
+</AdminLayout>
+
+<script>
+	import { authFetch } from '../../lib/auth';
+	import { API_BASE } from '../../lib/api';
+
+	interface Source {
+		id: string;
+		name: string;
+		slug: string;
+		media_type: string;
+		is_active: boolean;
+		base_url: string;
+		last_scraped_at: string | null;
+		last_scrape_status: string | null;
+		total_items_scraped: number;
+		consecutive_errors: number;
+	}
+
+	async function loadSources() {
+		try {
+			const res = await authFetch('/api/scraping-sources');
+			if (!res.ok) throw new Error('Error al cargar fuentes');
+
+			const sources: Source[] = await res.json();
+			renderStats(sources);
+			renderSources(sources);
+		} catch (error) {
+			console.error('Error loading sources:', error);
+			const container = document.getElementById('sources-container');
+			if (container) {
+				container.innerHTML = '<div class="error">Error al cargar fuentes. Asegúrate de haber iniciado sesión.</div>';
+			}
+		}
+	}
+
+	function renderStats(sources: Source[]) {
+		const container = document.getElementById('stats-container');
+		const metaContainer = document.getElementById('sources-meta');
+		if (!container) return;
+
+		const totalSources = sources.length;
+		const activeSources = sources.filter(s => s.is_active).length;
+		const totalItems = sources.reduce((sum, s) => sum + s.total_items_scraped, 0);
+		const sourcesWithErrors = sources.filter(s => s.consecutive_errors > 0).length;
+		const activePercentage = totalSources > 0 ? Math.round((activeSources / totalSources) * 100) : 0;
+
+		container.innerHTML = `
+			<div class="stat-card stat-primary">
+				<div class="stat-header">
+					<div class="stat-icon-wrapper">
+						<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+							<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+							<circle cx="12" cy="7" r="4"></circle>
+						</svg>
+					</div>
+					<span class="stat-trend">Total</span>
+				</div>
+				<div class="stat-value">${totalSources}</div>
+				<div class="stat-label">Fuentes configuradas</div>
+			</div>
+			<div class="stat-card stat-success">
+				<div class="stat-header">
+					<div class="stat-icon-wrapper">
+						<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+							<polyline points="9 11 12 14 22 4"></polyline>
+							<path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
+						</svg>
+					</div>
+					<span class="stat-trend">+${activePercentage}%</span>
+				</div>
+				<div class="stat-value">${activeSources}</div>
+				<div class="stat-label">Activas ahora</div>
+				<div class="stat-progress">
+					<div class="stat-progress-bar" style="width: ${activePercentage}%;"></div>
+				</div>
+			</div>
+			<div class="stat-card stat-info">
+				<div class="stat-header">
+					<div class="stat-icon-wrapper">
+						<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+							<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+							<polyline points="14 2 14 8 20 8"></polyline>
+							<line x1="16" y1="13" x2="8" y2="13"></line>
+							<line x1="16" y1="17" x2="8" y2="17"></line>
+							<polyline points="10 9 9 9 8 9"></polyline>
+						</svg>
+					</div>
+					<span class="stat-trend">Total</span>
+				</div>
+				<div class="stat-value">${totalItems.toLocaleString('es-AR')}</div>
+				<div class="stat-label">Artículos procesados</div>
+			</div>
+			${sourcesWithErrors > 0 ? `
+				<div class="stat-card stat-warning">
+					<div class="stat-header">
+						<div class="stat-icon-wrapper">
+							<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+								<path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+								<line x1="12" y1="9" x2="12" y2="13"></line>
+								<line x1="12" y1="17" x2="12.01" y2="17"></line>
+							</svg>
+						</div>
+						<span class="stat-trend">Alerta</span>
+					</div>
+					<div class="stat-value">${sourcesWithErrors}</div>
+					<div class="stat-label">Con errores</div>
+				</div>
+			` : ''}
+		`;
+
+		if (metaContainer) {
+			metaContainer.innerHTML = `<span class="meta-badge">${totalSources} fuentes</span>`;
+		}
+	}
+
+	function renderSources(sources: Source[]) {
+		const container = document.getElementById('sources-container');
+		if (!container) return;
+
+		if (!sources || sources.length === 0) {
+			container.innerHTML = '<div class="info">No hay fuentes configuradas</div>';
+			return;
+		}
+
+		container.innerHTML = sources.map(source => {
+			const formatDate = (dateStr: string | null) => {
+				if (!dateStr) return '<span style="color: #9ca3af;">Nunca</span>';
+				const date = new Date(dateStr);
+				const now = new Date();
+				const diffMs = now.getTime() - date.getTime();
+				const diffMins = Math.floor(diffMs / 60000);
+				const diffHours = Math.floor(diffMs / 3600000);
+				const diffDays = Math.floor(diffMs / 86400000);
+
+				if (diffMins < 60) return `Hace ${diffMins} min`;
+				if (diffHours < 24) return `Hace ${diffHours}h`;
+				if (diffDays < 7) return `Hace ${diffDays} días`;
+				return date.toLocaleDateString('es-AR', { day: '2-digit', month: 'short', year: 'numeric' });
+			};
+
+			const formatNumber = (num: number) => {
+				return num.toLocaleString('es-AR');
+			};
+
+			return `
+			<div class="source-card ${source.is_active ? 'is-active' : 'is-inactive'}" data-source-id="${source.id}">
+				<!-- Header with status -->
+				<div class="source-header">
+					<div class="source-title-wrapper">
+						<div class="source-status-badge ${source.is_active ? 'active' : 'inactive'}">
+							<span class="status-dot"></span>
+							${source.is_active ? 'Activa' : 'Inactiva'}
+						</div>
+						<h3 class="source-name">${source.name}</h3>
+						<span class="source-type-badge">${source.media_type}</span>
+					</div>
+					<label class="toggle-switch modern" title="${source.is_active ? 'Desactivar fuente' : 'Activar fuente'}">
+						<input type="checkbox" class="source-toggle" data-source-id="${source.id}" ${source.is_active ? 'checked' : ''}>
+						<span class="toggle-slider modern"></span>
+					</label>
+				</div>
+
+				<!-- URL -->
+				<div class="source-url">
+					<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+						<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
+						<path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
+					</svg>
+					<span>${source.base_url}</span>
+				</div>
+
+				<!-- Stats Grid -->
+				<div class="source-stats-grid">
+					<div class="mini-stat">
+						<div class="mini-stat-icon">
+							<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+								<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+							</svg>
+						</div>
+						<div class="mini-stat-content">
+							<div class="mini-stat-value">${formatNumber(source.total_items_scraped)}</div>
+							<div class="mini-stat-label">Artículos</div>
+						</div>
+					</div>
+					<div class="mini-stat">
+						<div class="mini-stat-icon">
+							<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+								<circle cx="12" cy="12" r="10"></circle>
+								<polyline points="12 6 12 12 16 14"></polyline>
+							</svg>
+						</div>
+						<div class="mini-stat-content">
+							<div class="mini-stat-value">${formatDate(source.last_scraped_at)}</div>
+							<div class="mini-stat-label">Último scraping</div>
+						</div>
+					</div>
+				</div>
+
+				<!-- Status Footer -->
+				${source.last_scrape_status || source.consecutive_errors > 0 ? `
+					<div class="source-footer">
+						${source.last_scrape_status ? `
+							<div class="status-pill ${source.last_scrape_status === 'success' ? 'success' : 'warning'}">
+								<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+									${source.last_scrape_status === 'success'
+										? '<polyline points="20 6 9 17 4 12"></polyline>'
+										: '<path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line>'
+									}
+								</svg>
+								${source.last_scrape_status === 'success' ? 'Último scraping exitoso' : 'Último scraping con errores'}
+							</div>
+						` : ''}
+						${source.consecutive_errors > 0 ? `
+							<div class="status-pill error">
+								<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+									<circle cx="12" cy="12" r="10"></circle>
+									<line x1="15" y1="9" x2="9" y2="15"></line>
+									<line x1="9" y1="9" x2="15" y2="15"></line>
+								</svg>
+								${source.consecutive_errors} ${source.consecutive_errors === 1 ? 'error consecutivo' : 'errores consecutivos'}
+							</div>
+						` : ''}
+					</div>
+				` : ''}
+			</div>
+			`;
+		}).join('');
+
+		// Add event listeners to toggles
+		document.querySelectorAll<HTMLInputElement>('.source-toggle').forEach(toggle => {
+			toggle.addEventListener('change', async function(this: HTMLInputElement) {
+				await toggleSourceActive(this.dataset.sourceId!, this.checked);
+			});
+		});
+	}
+
+	async function toggleSourceActive(sourceId: string, isActive: boolean) {
+		const card = document.querySelector(`[data-source-id="${sourceId}"]`);
+		const toggle = card?.querySelector<HTMLInputElement>('.source-toggle');
+
+		// Disable toggle while updating
+		if (toggle) toggle.disabled = true;
+
+		try {
+			const res = await authFetch(`/api/scraping-sources/${sourceId}`, {
+				method: 'PATCH',
+				body: JSON.stringify({
+					is_active: isActive
+				})
+			});
+
+			if (!res.ok) {
+				throw new Error('Error al actualizar fuente');
+			}
+
+			const sourceName = card?.querySelector('.source-name')?.textContent;
+			console.log(`Fuente ${sourceName} ${isActive ? 'activada' : 'desactivada'}`);
+
+			// Reload sources to update stats
+			loadSources();
+		} catch (error) {
+			console.error('Error toggling source:', error);
+			alert('Error al actualizar fuente');
+			// Revert toggle
+			if (toggle) {
+				toggle.checked = !isActive;
+			}
+		} finally {
+			if (toggle) toggle.disabled = false;
+		}
+	}
+
+	// Refresh button handler
+	document.addEventListener('DOMContentLoaded', () => {
+		loadSources();
+
+		const refreshBtn = document.getElementById('btn-refresh');
+		if (refreshBtn) {
+			refreshBtn.addEventListener('click', () => {
+				refreshBtn.classList.add('spinning');
+				loadSources().finally(() => {
+					setTimeout(() => {
+						refreshBtn.classList.remove('spinning');
+					}, 600);
+				});
+			});
+		}
+	});
+</script>
+
+<style is:global>
+	/* Variables and animations */
+	@keyframes shimmer {
+		0% { background-position: -1000px 0; }
+		100% { background-position: 1000px 0; }
+	}
+
+	@keyframes spin {
+		from { transform: rotate(0deg); }
+		to { transform: rotate(360deg); }
+	}
+
+	@keyframes fadeIn {
+		from { opacity: 0; transform: translateY(10px); }
+		to { opacity: 1; transform: translateY(0); }
+	}
+
+	/* Main Container */
+	.sources-admin {
+		max-width: 1440px;
+		margin: 0 auto;
+		padding: 20px;
+		animation: fadeIn 0.4s ease-out;
+	}
+
+	/* Hero Header */
+	.hero-header {
+		background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+		border-radius: 16px;
+		padding: 24px 32px;
+		margin-bottom: 20px;
+		color: white;
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		box-shadow: 0 10px 40px rgba(102, 126, 234, 0.3);
+		position: relative;
+		overflow: hidden;
+	}
+
+	.hero-header::before {
+		content: '';
+		position: absolute;
+		top: -50%;
+		right: -10%;
+		width: 500px;
+		height: 500px;
+		background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);
+		border-radius: 50%;
+	}
+
+	.hero-content {
+		position: relative;
+		z-index: 1;
+	}
+
+	.hero-badge {
+		display: inline-block;
+		background: rgba(255, 255, 255, 0.2);
+		padding: 6px 14px;
+		border-radius: 20px;
+		font-size: 0.75rem;
+		font-weight: 600;
+		text-transform: uppercase;
+		letter-spacing: 0.05em;
+		margin-bottom: 12px;
+		backdrop-filter: blur(10px);
+	}
+
+	.hero-title {
+		font-size: 1.875rem;
+		font-weight: 800;
+		margin: 0 0 4px;
+		letter-spacing: -0.03em;
+		text-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+	}
+
+	.hero-subtitle {
+		font-size: 0.9375rem;
+		opacity: 0.95;
+		margin: 0;
+		font-weight: 400;
+	}
+
+	.hero-actions {
+		position: relative;
+		z-index: 1;
+	}
+
+	.btn-refresh {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		padding: 12px 24px;
+		background: rgba(255, 255, 255, 0.95);
+		color: #667eea;
+		border: none;
+		border-radius: 12px;
+		font-weight: 600;
+		font-size: 0.9375rem;
+		cursor: pointer;
+		transition: all 0.3s ease;
+		box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
+	}
+
+	.btn-refresh:hover {
+		background: white;
+		transform: translateY(-2px);
+		box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);
+	}
+
+	.btn-refresh.spinning svg {
+		animation: spin 0.6s linear;
+	}
+
+	/* Stats Grid */
+	.stats-grid {
+		display: grid;
+		grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+		gap: 16px;
+		margin-bottom: 20px;
+	}
+
+	.stat-card {
+		background: white;
+		border-radius: 12px;
+		padding: 18px;
+		box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+		transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+		border: 1px solid #f0f0f0;
+		position: relative;
+		overflow: hidden;
+	}
+
+	.stat-card::before {
+		content: '';
+		position: absolute;
+		top: 0;
+		left: 0;
+		right: 0;
+		height: 3px;
+		background: linear-gradient(90deg, #3b82f6, #8b5cf6);
+		opacity: 0;
+		transition: opacity 0.3s ease;
+	}
+
+	.stat-card.stat-primary::before { background: linear-gradient(90deg, #3b82f6, #2563eb); }
+	.stat-card.stat-success::before { background: linear-gradient(90deg, #10b981, #059669); }
+	.stat-card.stat-info::before { background: linear-gradient(90deg, #8b5cf6, #7c3aed); }
+	.stat-card.stat-warning::before { background: linear-gradient(90deg, #f59e0b, #ef4444); }
+
+	.stat-card:hover {
+		transform: translateY(-4px);
+		box-shadow: 0 12px 28px rgba(0, 0, 0, 0.12);
+		border-color: transparent;
+	}
+
+	.stat-card:hover::before {
+		opacity: 1;
+	}
+
+	.stat-header {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		margin-bottom: 12px;
+	}
+
+	.stat-icon-wrapper {
+		width: 40px;
+		height: 40px;
+		border-radius: 10px;
+		background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		color: #3b82f6;
+	}
+
+	.stat-icon-wrapper svg {
+		width: 20px;
+		height: 20px;
+	}
+
+	.stat-success .stat-icon-wrapper {
+		background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+		color: #10b981;
+	}
+
+	.stat-info .stat-icon-wrapper {
+		background: linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%);
+		color: #8b5cf6;
+	}
+
+	.stat-warning .stat-icon-wrapper {
+		background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+		color: #f59e0b;
+	}
+
+	.stat-trend {
+		font-size: 0.75rem;
+		font-weight: 600;
+		padding: 4px 10px;
+		border-radius: 12px;
+		background: #f3f4f6;
+		color: #6b7280;
+	}
+
+	.stat-value {
+		font-size: 1.75rem;
+		font-weight: 800;
+		color: #1a1a1a;
+		line-height: 1;
+		margin-bottom: 4px;
+		letter-spacing: -0.02em;
+	}
+
+	.stat-label {
+		font-size: 0.8125rem;
+		color: #6b7280;
+		font-weight: 500;
+	}
+
+	.stat-progress {
+		height: 4px;
+		background: #f3f4f6;
+		border-radius: 4px;
+		margin-top: 12px;
+		overflow: hidden;
+	}
+
+	.stat-progress-bar {
+		height: 100%;
+		background: linear-gradient(90deg, #10b981, #059669);
+		border-radius: 4px;
+		transition: width 0.6s ease;
+	}
+
+	/* Sources Section */
+	.sources-section {
+		background: white;
+		border-radius: 16px;
+		padding: 24px;
+		box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+		border: 1px solid #f0f0f0;
+	}
+
+	.section-header {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		margin-bottom: 20px;
+		padding-bottom: 12px;
+		border-bottom: 2px solid #f3f4f6;
+	}
+
+	.section-title {
+		font-size: 1.25rem;
+		font-weight: 700;
+		color: #1a1a1a;
+		margin: 0;
+	}
+
+	.section-meta {
+		display: flex;
+		gap: 8px;
+		align-items: center;
+	}
+
+	.meta-badge {
+		font-size: 0.8125rem;
+		font-weight: 600;
+		padding: 6px 14px;
+		background: #f3f4f6;
+		color: #6b7280;
+		border-radius: 10px;
+	}
+
+	/* Sources List */
+	.sources-list {
+		display: grid;
+		grid-template-columns: repeat(auto-fill, minmax(480px, 1fr));
+		gap: 16px;
+	}
+
+	.source-card {
+		background: white;
+		border: 2px solid #f0f0f0;
+		border-radius: 12px;
+		padding: 18px;
+		transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+		position: relative;
+		overflow: hidden;
+	}
+
+	.source-card::before {
+		content: '';
+		position: absolute;
+		left: 0;
+		top: 0;
+		bottom: 0;
+		width: 4px;
+		background: #e5e7eb;
+		transition: all 0.3s ease;
+	}
+
+	.source-card.is-active::before {
+		background: linear-gradient(180deg, #10b981, #059669);
+		box-shadow: 0 0 20px rgba(16, 185, 129, 0.4);
+	}
+
+	.source-card.is-inactive::before {
+		background: #d1d5db;
+	}
+
+	.source-card:hover {
+		border-color: #667eea;
+		transform: translateY(-4px);
+		box-shadow: 0 12px 28px rgba(102, 126, 234, 0.15);
+	}
+
+	.source-header {
+		display: flex;
+		justify-content: space-between;
+		align-items: flex-start;
+		margin-bottom: 14px;
+		gap: 12px;
+	}
+
+	.source-title-wrapper {
+		flex: 1;
+		min-width: 0;
+	}
+
+	.source-status-badge {
+		display: inline-flex;
+		align-items: center;
+		gap: 5px;
+		padding: 3px 10px;
+		border-radius: 10px;
+		font-size: 0.6875rem;
+		font-weight: 700;
+		text-transform: uppercase;
+		letter-spacing: 0.05em;
+		margin-bottom: 8px;
+	}
+
+	.source-status-badge.active {
+		background: linear-gradient(135deg, #d1fae5, #a7f3d0);
+		color: #047857;
+	}
+
+	.source-status-badge.inactive {
+		background: #f3f4f6;
+		color: #6b7280;
+	}
+
+	.status-dot {
+		width: 5px;
+		height: 5px;
+		border-radius: 50%;
+		background: currentColor;
+		box-shadow: 0 0 0 2px rgba(currentColor, 0.2);
+	}
+
+	.source-name {
+		font-size: 1.125rem;
+		font-weight: 700;
+		color: #1a1a1a;
+		margin: 0 0 6px;
+		line-height: 1.3;
+		letter-spacing: -0.01em;
+	}
+
+	.source-type-badge {
+		display: inline-block;
+		padding: 4px 12px;
+		background: linear-gradient(135deg, #ede9fe, #ddd6fe);
+		color: #7c3aed;
+		border-radius: 8px;
+		font-size: 0.75rem;
+		font-weight: 700;
+		text-transform: uppercase;
+		letter-spacing: 0.05em;
+	}
+
+	/* Source URL */
+	.source-url {
+		display: flex;
+		align-items: center;
+		gap: 6px;
+		padding: 8px 10px;
+		background: #f9fafb;
+		border-radius: 8px;
+		margin-bottom: 12px;
+		font-size: 0.75rem;
+		color: #6366f1;
+		border: 1px solid #e5e7eb;
+	}
+
+	.source-url svg {
+		flex-shrink: 0;
+		color: #9ca3af;
+	}
+
+	.source-url span {
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+
+	/* Source Stats Grid */
+	.source-stats-grid {
+		display: grid;
+		grid-template-columns: repeat(2, 1fr);
+		gap: 10px;
+		margin-bottom: 12px;
+	}
+
+	.mini-stat {
+		display: flex;
+		align-items: center;
+		gap: 10px;
+		padding: 10px 12px;
+		background: #f9fafb;
+		border-radius: 10px;
+		border: 1px solid #e5e7eb;
+		transition: all 0.2s ease;
+	}
+
+	.mini-stat:hover {
+		background: #f3f4f6;
+		border-color: #d1d5db;
+	}
+
+	.mini-stat-icon {
+		width: 32px;
+		height: 32px;
+		border-radius: 8px;
+		background: linear-gradient(135deg, #dbeafe, #bfdbfe);
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		flex-shrink: 0;
+		color: #3b82f6;
+	}
+
+	.mini-stat-icon svg {
+		width: 14px;
+		height: 14px;
+	}
+
+	.mini-stat-content {
+		flex: 1;
+		min-width: 0;
+	}
+
+	.mini-stat-value {
+		font-size: 0.9375rem;
+		font-weight: 700;
+		color: #1a1a1a;
+		margin-bottom: 1px;
+	}
+
+	.mini-stat-label {
+		font-size: 0.625rem;
+		color: #6b7280;
+		font-weight: 600;
+		text-transform: uppercase;
+		letter-spacing: 0.03em;
+	}
+
+	/* Source Footer */
+	.source-footer {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 6px;
+		padding-top: 12px;
+		border-top: 1px solid #f3f4f6;
+	}
+
+	.status-pill {
+		display: inline-flex;
+		align-items: center;
+		gap: 5px;
+		padding: 5px 10px;
+		border-radius: 8px;
+		font-size: 0.6875rem;
+		font-weight: 600;
+	}
+
+	.status-pill.success {
+		background: linear-gradient(135deg, #d1fae5, #a7f3d0);
+		color: #047857;
+	}
+
+	.status-pill.warning {
+		background: linear-gradient(135deg, #fed7aa, #fdba74);
+		color: #c2410c;
+	}
+
+	.status-pill.error {
+		background: linear-gradient(135deg, #fecaca, #fca5a5);
+		color: #b91c1c;
+	}
+
+	.status-pill svg {
+		flex-shrink: 0;
+	}
+
+	/* Toggle Switch Modern */
+	.toggle-switch.modern {
+		position: relative;
+		display: inline-block;
+		width: 48px;
+		height: 26px;
+		flex-shrink: 0;
+	}
+
+	.toggle-switch.modern input {
+		opacity: 0;
+		width: 0;
+		height: 0;
+	}
+
+	.toggle-slider.modern {
+		position: absolute;
+		cursor: pointer;
+		top: 0;
+		left: 0;
+		right: 0;
+		bottom: 0;
+		background: #e5e7eb;
+		transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+		border-radius: 34px;
+	}
+
+	.toggle-slider.modern::before {
+		position: absolute;
+		content: "";
+		height: 20px;
+		width: 20px;
+		left: 3px;
+		bottom: 3px;
+		background: white;
+		transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+		border-radius: 50%;
+		box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+	}
+
+	input:checked + .toggle-slider.modern {
+		background: linear-gradient(135deg, #10b981, #059669);
+	}
+
+	input:checked + .toggle-slider.modern::before {
+		transform: translateX(22px);
+	}
+
+	input:focus + .toggle-slider.modern {
+		box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.2);
+	}
+
+	input:disabled + .toggle-slider.modern {
+		opacity: 0.5;
+		cursor: not-allowed;
+	}
+
+	/* Loading Shimmer */
+	.loading-shimmer {
+		background: linear-gradient(90deg, #f3f4f6 25%, #e5e7eb 50%, #f3f4f6 75%);
+		background-size: 1000px 100%;
+		animation: shimmer 2s infinite;
+		border-radius: 12px;
+		height: 90px;
+	}
+
+	/* Utilities */
+	.loading, .info {
+		padding: 60px 20px;
+		text-align: center;
+		color: #9ca3af;
+		font-size: 1rem;
+		font-weight: 500;
+	}
+
+	.error {
+		color: #dc2626;
+		padding: 40px 20px;
+		text-align: center;
+		background: linear-gradient(135deg, #fef2f2, #fee2e2);
+		border-radius: 16px;
+		border: 2px solid #fecaca;
+		font-weight: 600;
+	}
+
+	/* Responsive */
+	@media (max-width: 1200px) {
+		.sources-list {
+			grid-template-columns: 1fr;
+		}
+	}
+
+	@media (max-width: 768px) {
+		.sources-admin {
+			padding: 12px;
+		}
+
+		.hero-header {
+			flex-direction: column;
+			align-items: flex-start;
+			padding: 20px;
+		}
+
+		.hero-title {
+			font-size: 1.5rem;
+		}
+
+		.hero-subtitle {
+			font-size: 0.875rem;
+		}
+
+		.hero-actions {
+			width: 100%;
+			margin-top: 16px;
+		}
+
+		.btn-refresh {
+			width: 100%;
+			justify-content: center;
+		}
+
+		.stats-grid {
+			grid-template-columns: 1fr;
+		}
+
+		.sources-section {
+			padding: 16px;
+		}
+
+		.source-card {
+			padding: 14px;
+		}
+
+		.source-stats-grid {
+			grid-template-columns: 1fr;
+		}
+
+		.stat-value {
+			font-size: 1.5rem;
+		}
+
+		.source-name {
+			font-size: 1rem;
+		}
+	}
+
+	@media (max-width: 480px) {
+		.hero-title {
+			font-size: 1.375rem;
+		}
+
+		.section-header {
+			flex-direction: column;
+			align-items: flex-start;
+			gap: 10px;
+		}
+	}
+</style>

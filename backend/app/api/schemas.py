@@ -105,8 +105,79 @@ class ReadingLevelPreference(BaseModel):
     preferred_reading_level: str = Field(..., pattern="^(sin_vueltas|lo_central|en_profundidad)$")
 
 
+class SourcesPreference(BaseModel):
+    preferred_sources: list[str] | None = None
+
+
 class UserPreferences(BaseModel):
     preferred_reading_level: str
+    preferred_sources: list[str] | None = None
+
+
+# ===== SCRAPING RUNS SCHEMAS =====
+
+class ScrapingRunCreate(BaseModel):
+    """Schema for creating a new scraping run"""
+    triggered_by: str = Field(default="automatic", pattern="^(manual|automatic|scheduled)$")
+    triggered_by_user_id: uuid.UUID | None = None
+    sources_processed: list[str] = []
+    config_snapshot: dict | None = None
+    notes: str | None = None
+
+
+class ScrapingRunUpdate(BaseModel):
+    """Schema for updating a scraping run"""
+    finished_at: datetime | None = None
+    duration_seconds: int | None = None
+    status: str | None = Field(None, pattern="^(running|completed|failed|cancelled)$")
+    items_scraped: int | None = None
+    items_failed: int | None = None
+    items_duplicate: int | None = None
+    errors: list[dict] | None = None
+    error_message: str | None = None
+    notes: str | None = None
+    extra_metadata: dict | None = None
+
+
+class ScrapingRunOut(BaseModel):
+    """Schema for scraping run output"""
+    model_config = {"from_attributes": True}
+
+    id: uuid.UUID
+    started_at: datetime
+    finished_at: datetime | None
+    duration_seconds: int | None
+    status: str
+    triggered_by: str
+    triggered_by_user_id: uuid.UUID | None
+    sources_processed: list[str] | None
+    items_scraped: int
+    items_failed: int
+    items_duplicate: int
+    errors: list[dict] | None
+    error_message: str | None
+    config_snapshot: dict | None
+    notes: str | None
+    extra_metadata: dict | None
+
+
+class ScrapingRunList(BaseModel):
+    """Schema for paginated scraping run list"""
+    runs: list[ScrapingRunOut]
+    total: int
+    offset: int
+    limit: int
+
+
+class ScrapingRunStats(BaseModel):
+    """Statistics for scraping runs"""
+    total_runs: int
+    completed_runs: int
+    failed_runs: int
+    total_items_scraped: int
+    total_items_failed: int
+    avg_duration_seconds: float | None
+    last_run_at: datetime | None
 
 
 # ===== SCRAPING ITEMS SCHEMAS =====

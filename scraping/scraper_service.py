@@ -18,6 +18,8 @@ import os
 import sys
 import signal
 import importlib.util
+import uuid
+import json
 from datetime import datetime, timedelta
 from pathlib import Path
 from dotenv import load_dotenv
@@ -48,6 +50,12 @@ DB_CONFIG = {
 
 # Import control server
 from control_server import controller, start_control_server
+
+# Import Telegram notifier
+from telegram_notifier import get_notifier
+
+# Initialize Telegram notifier
+telegram_notifier = get_notifier()
 
 # Graceful shutdown flag
 shutdown_requested = False
@@ -163,18 +171,34 @@ async def update_source_stats(conn, source_id, status: str, message: str, items_
         )
 
     # Auto-disable if too many errors
-    await conn.execute(
+    result = await conn.execute(
         """
         UPDATE scraping_sources
         SET is_active = false,
             last_scrape_message = 'Auto-disabled: ' || last_scrape_message
         WHERE id = $1 AND consecutive_errors >= max_consecutive_errors
+        RETURNING name, consecutive_errors
         """,
         source_id
     )
 
+    # Notify if source was auto-disabled
+    if result != "UPDATE 0":
+        disabled_source = await conn.fetchrow(
+            "SELECT name, consecutive_errors FROM scraping_sources WHERE id = $1 AND is_active = false",
+            source_id
+        )
+        if disabled_source and telegram_notifier:
+            try:
+                await telegram_notifier.notify_source_disabled(
+                    source_name=disabled_source['name'],
+                    error_count=disabled_source['consecutive_errors']
+                )
+            except Exception as e:
+                log(f"Telegram notification failed: {e}", "WARN")
 
-async def run_scraper_for_source(conn, source: dict):
+
+async def run_scraper_for_source(conn, source: dict, scraping_run_id: str = None):
     """Execute scraper for a specific source"""
     source_id = source['id']
     source_name = source['name']
@@ -204,7 +228,13 @@ async def run_scraper_for_source(conn, source: dict):
         if not hasattr(scraper_module, 'main'):
             raise Exception("Scraper has no main() function")
 
-        result = await scraper_module.main()
+        # Pass scraping_run_id to the scraper if it supports it
+        import inspect
+        sig = inspect.signature(scraper_module.main)
+        if 'scraping_run_id' in sig.parameters:
+            result = await scraper_module.main(scraping_run_id=scraping_run_id)
+        else:
+            result = await scraper_module.main()
 
         if isinstance(result, dict):
             items_count = result.get('items_scraped', 0)
@@ -223,11 +253,28 @@ async def run_scraper_for_source(conn, source: dict):
         error_msg = str(e)[:500]
         log(f"  {source_name}: Error - {error_msg}", "ERROR")
         await update_source_stats(conn, source_id, "error", error_msg, 0)
+
+        # Notify source error
+        if telegram_notifier:
+            try:
+                consecutive = await conn.fetchval(
+                    "SELECT consecutive_errors FROM scraping_sources WHERE id = $1",
+                    source_id
+                )
+                await telegram_notifier.notify_source_error(
+                    source_name=source_name,
+                    error_message=error_msg,
+                    consecutive_errors=consecutive or 0
+                )
+            except Exception as notify_err:
+                log(f"Telegram notification failed: {notify_err}", "WARN")
+
         return 0
 
 
-async def run_scraping(source_ids: list = None):
+async def run_scraping(source_ids: list = None, triggered_by_user_id: str = None):
     """Run scraping for active sources, optionally filtered by IDs"""
+    start_time = datetime.now()
     log("=" * 50)
     if source_ids:
         log(f"Starting scraping for {len(source_ids)} selected source(s)")
@@ -236,6 +283,11 @@ async def run_scraping(source_ids: list = None):
     controller.current_task = "Scraping"
 
     total_items = 0
+    total_failed = 0
+    total_duplicate = 0
+    errors_list = []
+    scraping_run_id = None
+
     conn = await get_db_connection()
     try:
         sources = await get_active_sources(conn, source_ids)
@@ -246,16 +298,159 @@ async def run_scraping(source_ids: list = None):
 
         log(f"Found {len(sources)} source(s)")
 
+        # Create scraping run record
+        try:
+            triggered_by = "manual" if source_ids else "automatic"
+            sources_processed_ids = [str(s['id']) for s in sources]
+
+            # Generate UUID explicitly in Python to avoid database DEFAULT issues
+            scraping_run_id = uuid.uuid4()
+
+            await conn.execute(
+                """
+                INSERT INTO scraping_runs (
+                    id,
+                    started_at,
+                    status,
+                    triggered_by,
+                    triggered_by_user_id,
+                    sources_processed,
+                    items_scraped,
+                    items_failed,
+                    items_duplicate
+                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+                """,
+                scraping_run_id,
+                start_time,
+                'running',
+                triggered_by,
+                triggered_by_user_id,
+                sources_processed_ids,
+                0,  # items_scraped (will be updated at end)
+                0,  # items_failed (will be updated at end)
+                0   # items_duplicate (will be updated at end)
+            )
+            log(f"Created scraping run: {scraping_run_id}")
+        except Exception as e:
+            log(f"Failed to create scraping run record: {e}", "WARN")
+
+        # Notify scraping start
+        if telegram_notifier:
+            try:
+                mode = "manual" if source_ids else "automático"
+                source_names = [s['name'] for s in sources]
+
+                # Get user email if triggered by user
+                user_email = None
+                if triggered_by_user_id:
+                    try:
+                        user_uuid = uuid.UUID(triggered_by_user_id) if isinstance(triggered_by_user_id, str) else triggered_by_user_id
+                        user_row = await conn.fetchrow(
+                            "SELECT email FROM users WHERE id = $1",
+                            user_uuid
+                        )
+                        if user_row:
+                            user_email = user_row['email']
+                    except Exception:
+                        pass  # Ignore if user not found
+
+                await telegram_notifier.notify_scrape_start(
+                    source_count=len(sources),
+                    mode=mode,
+                    source_names=source_names,
+                    user_email=user_email
+                )
+            except Exception as e:
+                log(f"Telegram notification failed: {e}", "WARN")
+
         for source in sources:
             if shutdown_requested or controller.stop_requested:
                 log("Shutdown requested, stopping scraping")
                 break
-            items = await run_scraper_for_source(conn, source)
-            total_items += items
+            try:
+                items = await run_scraper_for_source(conn, source, scraping_run_id)
+                total_items += items
+            except Exception as e:
+                total_failed += 1
+                error_detail = {
+                    "source": source['name'],
+                    "error": str(e)[:500],
+                    "timestamp": datetime.now().isoformat()
+                }
+                errors_list.append(error_detail)
 
         log(f"Scraping cycle completed. Total items: {total_items}")
         controller.items_processed["scraped"] += total_items
+
+        # Update scraping run with final results
+        if scraping_run_id:
+            try:
+                finish_time = datetime.now()
+                duration = int((finish_time - start_time).total_seconds())
+                final_status = 'cancelled' if (shutdown_requested or controller.stop_requested) else 'completed'
+
+                await conn.execute(
+                    """
+                    UPDATE scraping_runs
+                    SET finished_at = $1,
+                        duration_seconds = $2,
+                        status = $3,
+                        items_scraped = $4,
+                        items_failed = $5,
+                        items_duplicate = $6,
+                        errors = $7::jsonb
+                    WHERE id = $8
+                    """,
+                    finish_time,
+                    duration,
+                    final_status,
+                    total_items,
+                    total_failed,
+                    total_duplicate,
+                    json.dumps(errors_list),
+                    scraping_run_id
+                )
+                log(f"Updated scraping run {scraping_run_id}: {final_status}")
+            except Exception as e:
+                log(f"Failed to update scraping run: {e}", "WARN")
+
+        # Notify scraping complete
+        if telegram_notifier:
+            try:
+                duration = (datetime.now() - start_time).total_seconds()
+                await telegram_notifier.notify_scrape_complete(
+                    total_items=total_items,
+                    sources_processed=len(sources),
+                    duration_seconds=duration
+                )
+            except Exception as e:
+                log(f"Telegram notification failed: {e}", "WARN")
+
         return total_items
+
+    except Exception as e:
+        # Mark run as failed
+        if scraping_run_id:
+            try:
+                finish_time = datetime.now()
+                duration = int((finish_time - start_time).total_seconds())
+                await conn.execute(
+                    """
+                    UPDATE scraping_runs
+                    SET finished_at = $1,
+                        duration_seconds = $2,
+                        status = 'failed',
+                        error_message = $3
+                    WHERE id = $4
+                    """,
+                    finish_time,
+                    duration,
+                    str(e)[:500],
+                    scraping_run_id
+                )
+            except Exception as update_error:
+                log(f"Failed to update scraping run on error: {update_error}", "WARN")
+        raise
 
     finally:
         await conn.close()
@@ -291,8 +486,9 @@ async def prepare_for_ai():
         controller.current_task = None
 
 
-async def process_ai():
+async def process_ai(mode: str = "automático"):
     """Process items with AI"""
+    start_time = datetime.now()
     log("Starting AI processing")
     controller.current_task = "AI Processing"
 
@@ -305,6 +501,27 @@ async def process_ai():
         return
 
     try:
+        # Get pending items count for notification
+        pending_count = 0
+        try:
+            conn = await get_db_connection()
+            pending_count = await conn.fetchval(
+                "SELECT COUNT(*) FROM scraping_items WHERE status IN ('scraped', 'ready_for_ai') AND retry_count < max_retries"
+            )
+            await conn.close()
+        except Exception:
+            pass
+
+        # Notify AI processing start
+        if telegram_notifier and pending_count > 0:
+            try:
+                await telegram_notifier.notify_ai_start(
+                    pending_count=pending_count,
+                    mode=mode
+                )
+            except Exception as e:
+                log(f"Telegram notification failed: {e}", "WARN")
+
         spec = importlib.util.spec_from_file_location("process_ai", process_ai_file)
         if spec and spec.loader:
             process_ai_module = importlib.util.module_from_spec(spec)
@@ -312,19 +529,44 @@ async def process_ai():
 
             if hasattr(process_ai_module, 'main'):
                 result = await process_ai_module.main()
+                processed_count = 0
+                failed_count = 0
                 if isinstance(result, dict):
-                    controller.items_processed["ai_processed"] += result.get("processed", 0)
+                    processed_count = result.get("processed", 0)
+                    failed_count = result.get("failed", 0)
+                    controller.items_processed["ai_processed"] += processed_count
                 log("AI processing completed")
+
+                # Notify AI processing complete
+                if telegram_notifier:
+                    try:
+                        duration = (datetime.now() - start_time).total_seconds()
+                        await telegram_notifier.notify_ai_complete(
+                            processed=processed_count,
+                            failed=failed_count,
+                            duration_seconds=duration
+                        )
+                    except Exception as e:
+                        log(f"Telegram notification failed: {e}", "WARN")
             else:
                 log("process_ai.py has no main() function", "WARN")
 
     except Exception as e:
         log(f"AI processing error: {e}", "ERROR")
+        # Notify error
+        if telegram_notifier:
+            try:
+                await telegram_notifier.notify_error(
+                    task_name="AI Processing",
+                    error_message=str(e)
+                )
+            except Exception as notify_err:
+                log(f"Telegram notification failed: {notify_err}", "WARN")
     finally:
         controller.current_task = None
 
 
-async def auto_prepare():
+async def auto_prepare(mode: str = "automático"):
     """Auto-prepare items for publishing after quality and duplicate checks"""
     log("Starting auto-prepare")
     controller.current_task = "Auto-Prepare"
@@ -338,6 +580,27 @@ async def auto_prepare():
         return
 
     try:
+        # Get pending items count for notification
+        pending_count = 0
+        try:
+            conn = await get_db_connection()
+            pending_count = await conn.fetchval(
+                "SELECT COUNT(*) FROM scraping_items WHERE status = 'ai_completed'"
+            )
+            await conn.close()
+        except Exception:
+            pass
+
+        # Notify auto-prepare start
+        if telegram_notifier and pending_count > 0:
+            try:
+                await telegram_notifier.notify_auto_prepare_start(
+                    pending_count=pending_count,
+                    mode=mode
+                )
+            except Exception as e:
+                log(f"Telegram notification failed: {e}", "WARN")
+
         spec = importlib.util.spec_from_file_location("auto_prepare", auto_prepare_file)
         if spec and spec.loader:
             auto_prepare_module = importlib.util.module_from_spec(spec)
@@ -348,16 +611,36 @@ async def auto_prepare():
                 if stats:
                     controller.items_processed["prepared"] += stats.get("ready", 0)
                     log(f"Auto-prepare: {stats.get('ready', 0)} listos, {stats.get('duplicates', 0)} duplicados, {stats.get('quality_failed', 0)} calidad insuficiente")
+
+                    # Notify auto-prepare complete
+                    if telegram_notifier:
+                        try:
+                            await telegram_notifier.notify_auto_prepare(
+                                ready=stats.get("ready", 0),
+                                duplicates=stats.get("duplicates", 0),
+                                quality_failed=stats.get("quality_failed", 0)
+                            )
+                        except Exception as e:
+                            log(f"Telegram notification failed: {e}", "WARN")
             else:
                 log("auto_prepare.py has no main() function", "WARN")
 
     except Exception as e:
         log(f"Auto-prepare error: {e}", "ERROR")
+        # Notify error
+        if telegram_notifier:
+            try:
+                await telegram_notifier.notify_error(
+                    task_name="Auto-Prepare",
+                    error_message=str(e)
+                )
+            except Exception as notify_err:
+                log(f"Telegram notification failed: {notify_err}", "WARN")
     finally:
         controller.current_task = None
 
 
-async def auto_publish():
+async def auto_publish(mode: str = "automático"):
     """Auto-publish items from sources with auto_publish enabled after delay period"""
     log("Starting auto-publish")
     controller.current_task = "Auto-Publish"
@@ -371,6 +654,27 @@ async def auto_publish():
         return
 
     try:
+        # Get pending items count for notification
+        pending_count = 0
+        try:
+            conn = await get_db_connection()
+            pending_count = await conn.fetchval(
+                "SELECT COUNT(*) FROM scraping_items WHERE status = 'ready_to_publish'"
+            )
+            await conn.close()
+        except Exception:
+            pass
+
+        # Notify auto-publish start
+        if telegram_notifier and pending_count > 0:
+            try:
+                await telegram_notifier.notify_auto_publish_start(
+                    pending_count=pending_count,
+                    mode=mode
+                )
+            except Exception as e:
+                log(f"Telegram notification failed: {e}", "WARN")
+
         spec = importlib.util.spec_from_file_location("auto_publish", auto_publish_file)
         if spec and spec.loader:
             auto_publish_module = importlib.util.module_from_spec(spec)
@@ -383,11 +687,27 @@ async def auto_publish():
                     if published > 0:
                         controller.items_processed["auto_published"] = controller.items_processed.get("auto_published", 0) + published
                         log(f"Auto-publish: {published} publicados automáticamente")
+
+                    # Notify auto-publish complete (even if 0 published)
+                    if telegram_notifier:
+                        try:
+                            await telegram_notifier.notify_auto_publish(published=published)
+                        except Exception as e:
+                            log(f"Telegram notification failed: {e}", "WARN")
             else:
                 log("auto_publish.py has no main() function", "WARN")
 
     except Exception as e:
         log(f"Auto-publish error: {e}", "ERROR")
+        # Notify error
+        if telegram_notifier:
+            try:
+                await telegram_notifier.notify_error(
+                    task_name="Auto-Publish",
+                    error_message=str(e)
+                )
+            except Exception as notify_err:
+                log(f"Telegram notification failed: {notify_err}", "WARN")
     finally:
         controller.current_task = None
 
@@ -436,6 +756,18 @@ async def curate_news(dry_run: bool = False):
                         if not dry_run and stats.get("published_count", 0) > 0:
                             controller.items_processed["curated"] += stats.get("published_count", 0)
                         log(f"Curation complete: {stats.get('total_available', 0)} disponibles, {stats.get('selected_count', 0)} seleccionados, {stats.get('published_count', 0)} publicados")
+
+                        # Notify curator complete
+                        if telegram_notifier and not dry_run:
+                            try:
+                                await telegram_notifier.notify_curator_complete(
+                                    published=stats.get("published_count", 0),
+                                    available=stats.get("total_available", 0),
+                                    selected=stats.get("selected_count", 0)
+                                )
+                            except Exception as e:
+                                log(f"Telegram notification failed: {e}", "WARN")
+
                         return stats
                 else:
                     log("news_curator.py has no curate_and_publish() function", "WARN")
@@ -444,6 +776,15 @@ async def curate_news(dry_run: bool = False):
 
     except Exception as e:
         log(f"Curation error: {e}", "ERROR")
+        # Notify error
+        if telegram_notifier:
+            try:
+                await telegram_notifier.notify_error(
+                    task_name="News Curation",
+                    error_message=str(e)
+                )
+            except Exception as notify_err:
+                log(f"Telegram notification failed: {notify_err}", "WARN")
     finally:
         controller.current_task = None
 
@@ -490,6 +831,22 @@ async def main():
 
     controller.status = "running"
 
+    # Send Telegram notification for service start
+    if telegram_notifier:
+        try:
+            await telegram_notifier.start()
+            await telegram_notifier.notify_service_start(
+                scrape_interval=controller.config.get("scrape_interval_minutes", SCRAPE_INTERVAL_MINUTES),
+                ai_interval=controller.config.get("ai_process_interval_minutes", AI_PROCESS_INTERVAL_MINUTES),
+                control_url=f"http://0.0.0.0:{CONTROL_SERVER_PORT}",
+                scrape_enabled=controller.config.get("scrape_enabled", True),
+                ai_enabled=controller.config.get("ai_process_enabled", True),
+                auto_prepare_enabled=controller.config.get("auto_prepare_enabled", True),
+                auto_publish_enabled=controller.config.get("auto_publish_enabled", True)
+            )
+        except Exception as e:
+            log(f"Telegram notification failed: {e}", "WARN")
+
     # Wait for database to be ready
     log("Waiting for database...")
     await asyncio.sleep(10)
@@ -505,22 +862,18 @@ async def main():
         scrape_interval = controller.config["scrape_interval_minutes"]
         ai_interval = controller.config["ai_process_interval_minutes"]
 
-        # Check for run-now request
+        # Check for run-now request (scraping only, no AI processing)
         if controller.run_now_requested:
             controller.run_now_requested = False
             source_ids = controller.run_source_ids
+            user_id = controller.run_user_id
             controller.run_source_ids = None  # Reset after use
-            log("Running immediate scraping cycle...")
+            controller.run_user_id = None
+            log("Running immediate scraping (scraping only)...")
             try:
-                await run_scraping(source_ids)
-                await prepare_for_ai()
-                await process_ai()
-                await auto_prepare()
-                await auto_publish()  # Auto-publish after auto-prepare
+                await run_scraping(source_ids, triggered_by_user_id=user_id)
                 last_scrape = datetime.now()
-                last_ai_process = datetime.now()
                 controller.last_scrape_time = last_scrape
-                controller.last_ai_time = last_ai_process
             except Exception as e:
                 log(f"Immediate run error: {e}", "ERROR")
             continue
@@ -533,27 +886,25 @@ async def main():
             last_ai_process = datetime.min
             continue
 
-        # Check for process-ai request (AI processing + auto-prepare + auto-publish)
+        # Check for process-ai request (AI processing only)
         if controller.process_ai_requested:
             controller.process_ai_requested = False
             log("Running AI processing (manual trigger)...")
             try:
-                await process_ai()
-                await auto_prepare()  # Auto-prepare after AI processing
-                await auto_publish()  # Auto-publish after auto-prepare
+                await prepare_for_ai()  # Mark scraped items as ready_for_ai
+                await process_ai(mode="manual")  # Process with AI
                 last_ai_process = datetime.now()
                 controller.last_ai_time = last_ai_process
             except Exception as e:
                 log(f"AI processing error: {e}", "ERROR")
             continue
 
-        # Check for auto-prepare request
+        # Check for auto-prepare request (validation only)
         if controller.auto_prepare_requested:
             controller.auto_prepare_requested = False
             log("Running auto-prepare (manual trigger)...")
             try:
-                await auto_prepare()
-                await auto_publish()  # Auto-publish after auto-prepare
+                await auto_prepare(mode="manual")
             except Exception as e:
                 log(f"Auto-prepare error: {e}", "ERROR")
             continue
@@ -563,7 +914,7 @@ async def main():
             controller.auto_publish_requested = False
             log("Running auto-publish (manual trigger)...")
             try:
-                await auto_publish()
+                await auto_publish(mode="manual")
             except Exception as e:
                 log(f"Auto-publish error: {e}", "ERROR")
             continue
@@ -583,32 +934,40 @@ async def main():
                 log(f"Curation error: {e}", "ERROR")
             continue
 
-        # Check if it's time to scrape
-        minutes_since_scrape = (now - last_scrape).total_seconds() / 60
-        if minutes_since_scrape >= scrape_interval:
-            try:
-                # Use selected sources from config (None = all active)
-                config_source_ids = controller.config.get("selected_source_ids")
-                await run_scraping(config_source_ids)
-                await prepare_for_ai()
-                last_scrape = datetime.now()
-                controller.last_scrape_time = last_scrape
-            except Exception as e:
-                log(f"Scraping cycle error: {e}", "ERROR")
+        # Check if it's time to scrape (only if enabled)
+        scrape_enabled = controller.config.get("scrape_enabled", True)
+        if scrape_enabled:
+            minutes_since_scrape = (now - last_scrape).total_seconds() / 60
+            if minutes_since_scrape >= scrape_interval:
+                try:
+                    # Use selected sources from config (None = all active)
+                    config_source_ids = controller.config.get("selected_source_ids")
+                    await run_scraping(config_source_ids)
+                    await prepare_for_ai()
+                    last_scrape = datetime.now()
+                    controller.last_scrape_time = last_scrape
+                except Exception as e:
+                    log(f"Scraping cycle error: {e}", "ERROR")
 
-        # Check if it's time to process AI
-        minutes_since_ai = (now - last_ai_process).total_seconds() / 60
-        if minutes_since_ai >= ai_interval:
-            try:
-                await process_ai()
-                # Auto-prepare after AI processing
-                await auto_prepare()
-                # Auto-publish after auto-prepare
-                await auto_publish()
-                last_ai_process = datetime.now()
-                controller.last_ai_time = last_ai_process
-            except Exception as e:
-                log(f"AI processing error: {e}", "ERROR")
+        # Check if it's time to process AI (only if enabled)
+        ai_enabled = controller.config.get("ai_process_enabled", True)
+        if ai_enabled:
+            minutes_since_ai = (now - last_ai_process).total_seconds() / 60
+            if minutes_since_ai >= ai_interval:
+                try:
+                    await process_ai()
+                    # Auto-prepare after AI processing (only if enabled)
+                    auto_prepare_enabled = controller.config.get("auto_prepare_enabled", True)
+                    if auto_prepare_enabled:
+                        await auto_prepare()
+                    # Auto-publish after auto-prepare (only if enabled)
+                    auto_publish_enabled = controller.config.get("auto_publish_enabled", True)
+                    if auto_publish_enabled:
+                        await auto_publish()
+                    last_ai_process = datetime.now()
+                    controller.last_ai_time = last_ai_process
+                except Exception as e:
+                    log(f"AI processing error: {e}", "ERROR")
 
         # Check if it's time to run curator (if enabled)
         curator_enabled = controller.config.get("curator_enabled", False)
@@ -633,6 +992,19 @@ async def main():
 
     controller.status = "stopped"
     log("Service shutdown complete")
+
+    # Send Telegram notification for service stop
+    if telegram_notifier:
+        try:
+            uptime_seconds = int((datetime.now() - controller.start_time).total_seconds())
+            await telegram_notifier.notify_service_stop(
+                uptime_seconds=uptime_seconds,
+                items_scraped=controller.items_processed.get("scraped", 0),
+                items_ai_processed=controller.items_processed.get("ai_processed", 0)
+            )
+            await telegram_notifier.stop()
+        except Exception as e:
+            log(f"Telegram notification failed: {e}", "WARN")
 
     # Cleanup
     await runner.cleanup()

@@ -21,6 +21,7 @@ class User(Base):
     is_active: Mapped[bool] = mapped_column(default=True)
     is_admin: Mapped[bool] = mapped_column(default=False)
     preferred_reading_level: Mapped[str] = mapped_column(String(32), default="lo_central")  # sin_vueltas|lo_central|en_profundidad
+    preferred_sources: Mapped[list[str] | None] = mapped_column(JSONB, nullable=True, default=None)  # Array of source IDs (UUIDs) for scraper
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.utcnow())
 
 
@@ -272,6 +273,53 @@ class ScrapingSource(Base):
     extra_metadata: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
 
 
+class ScrapingRun(Base):
+    """
+    Records of scraping execution runs.
+    Tracks each scraping session with metadata about sources processed, results, and status.
+    """
+    __tablename__ = "scraping_runs"
+
+    # Primary key
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+
+    # Execution metadata
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.utcnow(), index=True)
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    duration_seconds: Mapped[int | None] = mapped_column(Integer, nullable=True)
+
+    # Status: running, completed, failed, cancelled
+    status: Mapped[str] = mapped_column(String(32), default="running", index=True)
+
+    # Trigger: manual, automatic, scheduled
+    triggered_by: Mapped[str] = mapped_column(String(32), default="automatic")
+    triggered_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+
+    # Sources processed in this run (array of source IDs or slugs)
+    sources_processed: Mapped[list[str] | None] = mapped_column(ARRAY(String), nullable=True, default=list)
+
+    # Execution results
+    items_scraped: Mapped[int] = mapped_column(Integer, default=0)
+    items_failed: Mapped[int] = mapped_column(Integer, default=0)
+    items_duplicate: Mapped[int] = mapped_column(Integer, default=0)
+
+    # Error information
+    errors: Mapped[list[dict] | None] = mapped_column(JSONB, nullable=True, default=list)  # [{"source": "...", "error": "...", "timestamp": "..."}]
+    error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    # Configuration snapshot
+    config_snapshot: Mapped[dict | None] = mapped_column(JSONB, nullable=True)  # Config used for this run
+
+    # Metadata
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    extra_metadata: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+
+    # Relationships
+    scraping_items: Mapped[list["ScrapingItem"]] = relationship(back_populates="scraping_run", foreign_keys="[ScrapingItem.scraping_run_id]")
+
+
 class ScrapingItem(Base):
     """
     Staging table for all scraped content.
@@ -308,7 +356,9 @@ class ScrapingItem(Base):
     # ===== SCRAPING TRACEABILITY =====
     scraper_name: Mapped[str] = mapped_column(String(100))
     scraper_version: Mapped[str | None] = mapped_column(String(20), nullable=True)
-    scraping_run_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True, index=True)
+    scraping_run_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("scraping_runs.id", ondelete="SET NULL"), nullable=True, index=True
+    )
     scraped_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.utcnow(), index=True)
     scraping_duration_ms: Mapped[int | None] = mapped_column(Integer, nullable=True)
     scraper_ip_address: Mapped[str | None] = mapped_column(INET, nullable=True)
@@ -360,6 +410,9 @@ class ScrapingItem(Base):
         Index('idx_scraping_items_media_date', 'source_media', 'article_date'),
         Index('idx_scraping_items_status_updated', 'status', 'status_updated_at'),
     )
+
+    # Relationships
+    scraping_run: Mapped[Optional["ScrapingRun"]] = relationship(back_populates="scraping_items", foreign_keys=[scraping_run_id])
 
 
 class SiteConfig(Base):

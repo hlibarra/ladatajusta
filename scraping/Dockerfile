@@ -31,7 +31,8 @@ RUN pip install --no-cache-dir \
     trafilatura \
     beautifulsoup4 \
     aiohttp \
-    feedparser
+    feedparser \
+    python-telegram-bot==20.7
 
 # Install Playwright browsers
 RUN playwright install chromium

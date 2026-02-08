@@ -1,0 +1,1114 @@
+---
+import AdminLayout from '../../layouts/AdminLayout.astro';
+
+const title = 'Monitor de Scraping';
+---
+
+<AdminLayout title={title}>
+	<div class="scraper-monitor">
+		<header class="page-header">
+			<div class="header-content">
+				<div>
+					<h1>Monitor de Scraping</h1>
+					<p class="subtitle">Controla y configura el scraper automático</p>
+				</div>
+				<div class="header-actions">
+					<a href="/admin/scraper-history" class="btn btn-secondary btn-header">
+						📊 Ver Historial
+					</a>
+				</div>
+			</div>
+		</header>
+
+		<!-- Selección de Fuentes -->
+		<section class="sources-panel">
+			<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+				<h2 style="margin: 0;">Fuentes de Scraping</h2>
+				<a href="/admin/fuentes" class="btn btn-sm btn-secondary" style="text-decoration: none;">
+					⚙️ Administrar fuentes
+				</a>
+			</div>
+			<p class="help-text">Selecciona las fuentes de noticias que deseas scrapear para esta ejecución. La selección es temporal y no se guarda.</p>
+			<div id="sources-container" class="sources-grid">
+				<div class="loading">Cargando fuentes...</div>
+			</div>
+			<div class="sources-actions">
+				<button class="btn btn-sm btn-link" id="btn-select-all">
+					✓ Seleccionar todas
+				</button>
+				<button class="btn btn-sm btn-link" id="btn-select-none">
+					✗ Deseleccionar todas
+				</button>
+			</div>
+		</section>
+
+		<!-- Acciones Manuales -->
+		<section class="actions-panel">
+			<h2>Ejecución Manual</h2>
+			<p class="help-text">Ejecuta las tareas del pipeline de scraping de forma manual. Sigue el orden: Scraping → IA → Preparar → Publicar</p>
+
+			<div class="actions-grid">
+				<div class="action-card">
+					<div class="action-header">
+						<span class="action-icon">🔍</span>
+						<h3>1. Ejecutar Scraping</h3>
+					</div>
+					<p class="action-description">Extrae artículos de las fuentes seleccionadas y los guarda en estado "scraped"</p>
+					<button class="btn btn-primary" id="btn-run-now">
+						<span class="icon">▶</span>
+						Ejecutar Ahora
+					</button>
+				</div>
+
+				<div class="action-card">
+					<div class="action-header">
+						<span class="action-icon">🤖</span>
+						<h3>2. Procesar con IA</h3>
+					</div>
+					<p class="action-description">Analiza artículos scrapeados usando OpenAI: genera resúmenes, extrae tags, clasifica categorías y detecta personas</p>
+					<button class="btn btn-secondary" id="btn-process-ai">
+						<span class="icon">🤖</span>
+						Procesar IA
+					</button>
+				</div>
+
+				<div class="action-card">
+					<div class="action-header">
+						<span class="action-icon">📋</span>
+						<h3>3. Auto-Preparar</h3>
+					</div>
+					<p class="action-description">Valida calidad de artículos procesados, elimina duplicados y marca como "ready" los aptos para publicación</p>
+					<button class="btn btn-secondary" id="btn-auto-prepare">
+						<span class="icon">📝</span>
+						Auto-Preparar
+					</button>
+				</div>
+
+				<div class="action-card">
+					<div class="action-header">
+						<span class="action-icon">✨</span>
+						<h3>4. Curar y Publicar</h3>
+					</div>
+					<p class="action-description">Selecciona los mejores artículos "ready" según scoring y los publica automáticamente en la página</p>
+					<button class="btn btn-secondary" id="btn-curate">
+						<span class="icon">✨</span>
+						Curar y Publicar
+					</button>
+				</div>
+			</div>
+		</section>
+
+		<!-- Configuración de Servicios Automáticos -->
+		<section class="config-panel">
+			<h2>Servicios Automáticos</h2>
+			<p class="help-text">Activá o desactivá los servicios automáticos del scraper. Cuando están desactivados, solo se ejecutan de forma manual.</p>
+
+			<div class="toggles-grid">
+				<!-- Scraping Automático -->
+				<div class="toggle-item">
+					<div class="toggle-info">
+						<label class="toggle-label">🔍 Scraping Automático</label>
+						<p class="toggle-description">Ejecuta scraping periódicamente según el intervalo configurado</p>
+					</div>
+					<label class="toggle-switch">
+						<input type="checkbox" id="scrape-enabled" checked>
+						<span class="toggle-slider"></span>
+					</label>
+				</div>
+
+				<!-- Procesamiento IA Automático -->
+				<div class="toggle-item">
+					<div class="toggle-info">
+						<label class="toggle-label">🤖 Procesamiento IA Automático</label>
+						<p class="toggle-description">Procesa con IA los artículos scrapeados automáticamente</p>
+					</div>
+					<label class="toggle-switch">
+						<input type="checkbox" id="ai-enabled" checked>
+						<span class="toggle-slider"></span>
+					</label>
+				</div>
+
+				<!-- Auto-Preparar -->
+				<div class="toggle-item">
+					<div class="toggle-info">
+						<label class="toggle-label">📋 Auto-Preparar</label>
+						<p class="toggle-description">Valida y prepara automáticamente artículos después de IA</p>
+					</div>
+					<label class="toggle-switch">
+						<input type="checkbox" id="auto-prepare-enabled" checked>
+						<span class="toggle-slider"></span>
+					</label>
+				</div>
+
+				<!-- Auto-Publicar -->
+				<div class="toggle-item">
+					<div class="toggle-info">
+						<label class="toggle-label">📰 Auto-Publicar</label>
+						<p class="toggle-description">Publica automáticamente artículos de fuentes configuradas</p>
+					</div>
+					<label class="toggle-switch">
+						<input type="checkbox" id="auto-publish-enabled" checked>
+						<span class="toggle-slider"></span>
+					</label>
+				</div>
+			</div>
+		</section>
+
+		<!-- Configuración de Intervalos -->
+		<section class="config-panel">
+			<h2>Configuración de Intervalos</h2>
+			<p class="help-text">Define cada cuánto tiempo se ejecutan los servicios automáticos cuando están habilitados.</p>
+
+			<div class="config-grid">
+				<!-- Intervalo de Scraping -->
+				<div class="config-item">
+					<label>Intervalo de Scraping</label>
+					<select id="scrape-interval" class="input">
+						<option value="60">Cada hora (60 min)</option>
+						<option value="90">Cada 1.5 horas (90 min)</option>
+						<option value="120">Cada 2 horas (120 min)</option>
+						<option value="180">Cada 3 horas (180 min)</option>
+						<option value="360">Cada 6 horas (360 min)</option>
+						<option value="720">Cada 12 horas (720 min)</option>
+						<option value="1440">Diario (1440 min)</option>
+						<option value="10080">Semanal (10080 min)</option>
+					</select>
+				</div>
+
+				<!-- Intervalo de Procesamiento IA -->
+				<div class="config-item">
+					<label>Intervalo de Procesamiento IA</label>
+					<select id="ai-interval" class="input">
+						<option value="30">Cada 30 min</option>
+						<option value="60">Cada hora (60 min)</option>
+						<option value="90">Cada 1.5 horas (90 min)</option>
+						<option value="120">Cada 2 horas (120 min)</option>
+						<option value="180">Cada 3 horas (180 min)</option>
+					</select>
+				</div>
+
+				<!-- Horas de preparación -->
+				<div class="config-item">
+					<label>Preparar artículos de últimas (horas)</label>
+					<input type="number" id="prepare-hours" class="input" min="1" max="168" value="24">
+				</div>
+			</div>
+
+			<button class="btn btn-success" id="btn-save-config">
+				<span class="icon">💾</span>
+				Guardar Configuración
+			</button>
+		</section>
+
+		<!-- Logs -->
+		<section class="logs-panel">
+			<h2>Logs en Tiempo Real</h2>
+			<div class="logs-container" id="logs-container">
+				<div class="log-entry">Conectando a logs...</div>
+			</div>
+		</section>
+	</div>
+</AdminLayout>
+
+<script>
+	import { authFetch } from '../../lib/auth';
+
+	const API_BASE = import.meta.env.PUBLIC_CLIENT_API_BASE_URL || import.meta.env.PUBLIC_API_BASE_URL || '';
+
+	// Cargar fuentes de scraping
+	async function loadSources() {
+		try {
+			const sourcesRes = await authFetch('/api/scraping-sources');
+			if (!sourcesRes.ok) throw new Error('Error al cargar fuentes');
+
+			const sources = await sourcesRes.json();
+			renderSources(sources);
+		} catch (error) {
+			console.error('Error loading sources:', error);
+			const container = document.getElementById('sources-container');
+			if (container) {
+				container.innerHTML = '<div class="error">Error al cargar fuentes</div>';
+			}
+		}
+	}
+
+	function renderSources(sources: any[]) {
+		const container = document.getElementById('sources-container');
+		if (!container) return;
+
+		if (!sources || sources.length === 0) {
+			container.innerHTML = '<div class="info">No hay fuentes configuradas</div>';
+			return;
+		}
+
+		// Por defecto, marcar todas las fuentes disponibles
+		container.innerHTML = sources.map(source => `
+			<label class="source-item"
+				style="display: flex; align-items: center; gap: 14px; padding: 16px 18px; background: #f8f9fa; border: 2px solid #e2e8f0; border-radius: 8px; cursor: pointer; transition: all 0.25s ease; position: relative; overflow: hidden;">
+				<input type="checkbox"
+					class="source-checkbox"
+					value="${source.id}"
+					style="width: 20px; height: 20px; cursor: pointer; accent-color: #3b82f6; flex-shrink: 0;"
+					checked>
+				<div class="source-info" style="flex: 1; display: flex; align-items: center; min-width: 0;">
+					<span class="source-name" style="font-weight: 600; font-size: 0.9375rem; color: #1e293b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${source.name}</span>
+				</div>
+			</label>
+		`).join('');
+
+		// Add event listeners and set initial state
+		document.querySelectorAll<HTMLInputElement>('.source-checkbox').forEach(checkbox => {
+			// Set initial visual state
+			if (checkbox.checked) {
+				const label = checkbox.closest('.source-item') as HTMLElement;
+				if (label) {
+					label.classList.add('selected');
+					label.style.borderColor = '#3b82f6';
+					label.style.background = 'rgba(59, 130, 246, 0.08)';
+				}
+			}
+
+			// Add change listener
+			checkbox.addEventListener('change', function(this: HTMLInputElement) {
+				handleCheckboxChange(this);
+			});
+		});
+	}
+
+	// Obtener fuentes seleccionadas
+	function getSelectedSources(): string[] {
+		const checkboxes = document.querySelectorAll<HTMLInputElement>('.source-checkbox:checked');
+		return Array.from(checkboxes).map(cb => cb.value);
+	}
+
+	// Handle checkbox selection visual feedback
+	function handleCheckboxChange(checkbox: HTMLInputElement) {
+		const label = checkbox.closest('.source-item') as HTMLElement;
+		if (label) {
+			if (checkbox.checked) {
+				label.classList.add('selected');
+				label.style.borderColor = '#3b82f6';
+				label.style.background = 'rgba(59, 130, 246, 0.08)';
+			} else {
+				label.classList.remove('selected');
+				label.style.borderColor = '#e2e8f0';
+				label.style.background = '#f8f9fa';
+			}
+		}
+	}
+
+	// Seleccionar/Deseleccionar todas
+	document.getElementById('btn-select-all')?.addEventListener('click', () => {
+		document.querySelectorAll<HTMLInputElement>('.source-checkbox').forEach(cb => {
+			cb.checked = true;
+			handleCheckboxChange(cb);
+		});
+	});
+
+	document.getElementById('btn-select-none')?.addEventListener('click', () => {
+		document.querySelectorAll<HTMLInputElement>('.source-checkbox').forEach(cb => {
+			cb.checked = false;
+			handleCheckboxChange(cb);
+		});
+	});
+
+	// Cargar configuración actual
+	async function loadConfig() {
+		try {
+			const res = await fetch(`${API_BASE}/api/scraper/config`);
+			if (!res.ok) throw new Error('Error al cargar configuración');
+
+			const config = await res.json();
+
+			// Toggles
+			const scrapeEnabled = document.getElementById('scrape-enabled') as HTMLInputElement;
+			const aiEnabled = document.getElementById('ai-enabled') as HTMLInputElement;
+			const autoPrepareEnabled = document.getElementById('auto-prepare-enabled') as HTMLInputElement;
+			const autoPublishEnabled = document.getElementById('auto-publish-enabled') as HTMLInputElement;
+
+			if (scrapeEnabled) scrapeEnabled.checked = config.scrape_enabled !== false;
+			if (aiEnabled) aiEnabled.checked = config.ai_process_enabled !== false;
+			if (autoPrepareEnabled) autoPrepareEnabled.checked = config.auto_prepare_enabled !== false;
+			if (autoPublishEnabled) autoPublishEnabled.checked = config.auto_publish_enabled !== false;
+
+			// Intervals
+			const scrapeInterval = document.getElementById('scrape-interval') as HTMLSelectElement;
+			const aiInterval = document.getElementById('ai-interval') as HTMLSelectElement;
+			const prepareHours = document.getElementById('prepare-hours') as HTMLInputElement;
+
+			if (scrapeInterval) scrapeInterval.value = String(config.scrape_interval_minutes || 60);
+			if (aiInterval) aiInterval.value = String(config.ai_process_interval_minutes || 30);
+			if (prepareHours) prepareHours.value = String(config.prepare_hours_ago || 24);
+		} catch (error) {
+			console.error('Error loading config:', error);
+		}
+	}
+
+	// Guardar configuración
+	document.getElementById('btn-save-config')?.addEventListener('click', async () => {
+		// Toggles
+		const scrapeEnabledEl = document.getElementById('scrape-enabled') as HTMLInputElement;
+		const aiEnabledEl = document.getElementById('ai-enabled') as HTMLInputElement;
+		const autoPrepareEnabledEl = document.getElementById('auto-prepare-enabled') as HTMLInputElement;
+		const autoPublishEnabledEl = document.getElementById('auto-publish-enabled') as HTMLInputElement;
+
+		// Intervals
+		const scrapeIntervalEl = document.getElementById('scrape-interval') as HTMLSelectElement;
+		const aiIntervalEl = document.getElementById('ai-interval') as HTMLSelectElement;
+		const prepareHoursEl = document.getElementById('prepare-hours') as HTMLInputElement;
+
+		if (!scrapeIntervalEl || !aiIntervalEl || !prepareHoursEl) return;
+
+		const scrapeInterval = parseInt(scrapeIntervalEl.value);
+		const aiInterval = parseInt(aiIntervalEl.value);
+		const prepareHours = parseInt(prepareHoursEl.value);
+
+		try {
+			const res = await authFetch('/api/scraper/config', {
+				method: 'PUT',
+				body: JSON.stringify({
+					scrape_enabled: scrapeEnabledEl?.checked || false,
+					ai_process_enabled: aiEnabledEl?.checked || false,
+					auto_prepare_enabled: autoPrepareEnabledEl?.checked || false,
+					auto_publish_enabled: autoPublishEnabledEl?.checked || false,
+					scrape_interval_minutes: scrapeInterval,
+					ai_process_interval_minutes: aiInterval,
+					prepare_hours_ago: prepareHours
+				})
+			});
+
+			if (!res.ok) throw new Error('Error al guardar');
+
+			alert('Configuración guardada correctamente');
+		} catch (error) {
+			console.error('Error saving config:', error);
+			alert('Error al guardar configuración');
+		}
+	});
+
+	// Ejecutar ahora
+	document.getElementById('btn-run-now')?.addEventListener('click', async () => {
+		const selectedSources = getSelectedSources();
+
+		if (selectedSources.length === 0) {
+			alert('Seleccioná al menos una fuente');
+			return;
+		}
+
+		const msg = selectedSources.length === document.querySelectorAll('.source-checkbox').length
+			? '¿Ejecutar scraping para todas las fuentes?'
+			: `¿Ejecutar scraping para ${selectedSources.length} fuente(s) seleccionada(s)?`;
+
+		if (!confirm(msg)) return;
+
+		try {
+			const res = await authFetch('/api/scraper/run-now', {
+				method: 'POST',
+				body: JSON.stringify({
+					source_ids: selectedSources
+				})
+			});
+
+			if (!res.ok) throw new Error('Error al ejecutar');
+
+			alert('Scraping iniciado');
+		} catch (error) {
+			console.error('Error running scraper:', error);
+			alert('Error al ejecutar scraper');
+		}
+	});
+
+	// Procesar IA
+	document.getElementById('btn-process-ai')?.addEventListener('click', async () => {
+		if (!confirm('¿Procesar con IA ahora?')) return;
+
+		try {
+			const res = await authFetch('/api/scraper/process-ai', {
+				method: 'POST'
+			});
+
+			if (!res.ok) throw new Error('Error al procesar');
+
+			alert('Procesamiento IA iniciado');
+		} catch (error) {
+			console.error('Error processing AI:', error);
+			alert('Error al procesar IA');
+		}
+	});
+
+	// Auto-preparar
+	document.getElementById('btn-auto-prepare')?.addEventListener('click', async () => {
+		if (!confirm('¿Ejecutar auto-preparación ahora?')) return;
+
+		try {
+			const res = await authFetch('/api/scraper/auto-prepare', {
+				method: 'POST'
+			});
+
+			if (!res.ok) throw new Error('Error al preparar');
+
+			alert('Auto-preparación iniciada');
+		} catch (error) {
+			console.error('Error auto-preparing:', error);
+			alert('Error al auto-preparar');
+		}
+	});
+
+	// Curar y publicar
+	document.getElementById('btn-curate')?.addEventListener('click', async () => {
+		if (!confirm('¿Curar y publicar noticias ahora?')) return;
+
+		try {
+			const res = await authFetch('/api/scraper/curate', {
+				method: 'POST',
+				body: JSON.stringify({ dry_run: false })
+			});
+
+			if (!res.ok) throw new Error('Error al curar');
+
+			alert('Curación iniciada');
+		} catch (error) {
+			console.error('Error curating:', error);
+			alert('Error al curar noticias');
+		}
+	});
+
+	// Cargar logs
+	async function loadLogs() {
+		try {
+			const res = await fetch(`${API_BASE}/api/scraper/logs?limit=50`);
+			if (!res.ok) throw new Error('Error al cargar logs');
+
+			const data = await res.json();
+			const container = document.getElementById('logs-container');
+			if (!container) return;
+
+			if (data.logs && data.logs.length > 0) {
+				container.innerHTML = data.logs.map((log: any) =>
+					`<div class="log-entry log-${log.level.toLowerCase()}">
+						<span class="log-time">${log.timestamp}</span>
+						<span class="log-level">${log.level}</span>
+						<span class="log-message">${log.message}</span>
+					</div>`
+				).join('');
+			} else {
+				container.innerHTML = '<div class="log-entry">No hay logs disponibles</div>';
+			}
+
+			// Auto-scroll al final
+			container.scrollTop = container.scrollHeight;
+		} catch (error) {
+			console.error('Error loading logs:', error);
+		}
+	}
+
+	// Inicializar
+	document.addEventListener('DOMContentLoaded', () => {
+		loadSources();
+		loadConfig();
+		loadLogs();
+
+		// Actualizar logs cada 5 segundos
+		setInterval(loadLogs, 5000);
+	});
+</script>
+
+<style>
+	/* Updated: 2026-02-06 */
+	.scraper-monitor {
+		max-width: 1200px;
+		margin: 0 auto;
+		padding: 20px;
+	}
+
+	.page-header {
+		margin-bottom: 32px;
+	}
+
+	.header-content {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		gap: 20px;
+		flex-wrap: wrap;
+	}
+
+	.header-actions {
+		display: flex;
+		gap: 12px;
+	}
+
+	.btn-header {
+		padding: 10px 20px;
+		border-radius: 8px;
+		font-size: 0.9375rem;
+		text-decoration: none;
+		display: inline-flex;
+		align-items: center;
+		gap: 8px;
+		white-space: nowrap;
+	}
+
+	.page-header h1 {
+		font-size: 2rem;
+		font-weight: 700;
+		color: var(--text-primary);
+		margin: 0 0 8px;
+	}
+
+	.subtitle {
+		color: var(--text-secondary);
+		margin: 0;
+	}
+
+	section {
+		background: var(--bg-card);
+		border: 1px solid var(--border-subtle);
+		border-radius: 8px;
+		padding: 24px;
+		margin-bottom: 24px;
+	}
+
+	section h2 {
+		font-size: 1.25rem;
+		font-weight: 600;
+		color: var(--text-primary);
+		margin: 0 0 20px;
+	}
+
+	/* Estado */
+	.status-grid {
+		display: grid;
+		grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+		gap: 16px;
+	}
+
+	.status-card {
+		background: var(--bg-secondary);
+		padding: 16px;
+		border-radius: 6px;
+		display: flex;
+		flex-direction: column;
+		gap: 8px;
+	}
+
+	.status-card .label {
+		font-size: 0.875rem;
+		color: var(--text-muted);
+		font-weight: 500;
+	}
+
+	.status-card .value {
+		font-size: 1.125rem;
+		font-weight: 600;
+		color: var(--text-primary);
+	}
+
+	.status-running {
+		color: #10b981 !important;
+	}
+
+	.status-stopped {
+		color: #ef4444 !important;
+	}
+
+	.status-paused {
+		color: #f59e0b !important;
+	}
+
+	/* Fuentes de scraping */
+	.sources-grid {
+		display: grid;
+		grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+		gap: 16px;
+		margin-bottom: 20px;
+	}
+
+	.source-item {
+		display: flex;
+		align-items: center;
+		gap: 14px;
+		padding: 16px 18px;
+		background: #f8f9fa;
+		border: 2px solid #e2e8f0;
+		border-radius: 8px;
+		cursor: pointer;
+		transition: all 0.25s ease;
+		position: relative;
+		overflow: hidden;
+	}
+
+	.source-item::before {
+		content: '';
+		position: absolute;
+		left: 0;
+		top: 0;
+		bottom: 0;
+		width: 4px;
+		background: transparent;
+		transition: background 0.25s ease;
+	}
+
+	.source-item:hover {
+		border-color: #3b82f6;
+		background: #f1f3f5;
+		transform: translateY(-2px);
+		box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+	}
+
+	.source-item.selected {
+		border-color: #3b82f6 !important;
+		background: rgba(59, 130, 246, 0.08) !important;
+	}
+
+	.source-item.selected::before {
+		background: #3b82f6 !important;
+	}
+
+	.source-checkbox:checked + .source-info {
+		/* Visual feedback that checkbox is checked */
+	}
+
+	.source-item.inactive {
+		opacity: 0.5;
+		background: var(--bg-primary);
+	}
+
+	.source-item.inactive:hover {
+		opacity: 0.7;
+	}
+
+	.source-checkbox {
+		width: 20px;
+		height: 20px;
+		cursor: pointer;
+		accent-color: var(--accent-secondary);
+		flex-shrink: 0;
+	}
+
+	.source-info {
+		flex: 1;
+		display: flex;
+		flex-direction: column;
+		gap: 6px;
+		min-width: 0;
+	}
+
+	.source-name {
+		font-weight: 600;
+		color: var(--text-primary);
+		font-size: 1rem;
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+
+	.source-status {
+		font-size: 0.75rem;
+		font-weight: 600;
+		text-transform: uppercase;
+		letter-spacing: 0.5px;
+		display: inline-flex;
+		align-items: center;
+		gap: 4px;
+	}
+
+	.source-status::before {
+		content: '●';
+		font-size: 0.6rem;
+	}
+
+	.source-status.active {
+		color: #10b981;
+	}
+
+	.source-status.inactive {
+		color: #ef4444;
+	}
+
+	.sources-actions {
+		display: flex;
+		gap: 8px;
+		padding-top: 16px;
+		margin-top: 4px;
+		border-top: 1px solid var(--border-subtle);
+		justify-content: flex-start;
+	}
+
+	.btn-sm {
+		padding: 8px 16px;
+		font-size: 0.875rem;
+		font-weight: 500;
+	}
+
+	.btn-link {
+		background: var(--bg-secondary);
+		color: var(--accent-secondary);
+		border: 1px solid var(--border-subtle);
+		padding: 8px 16px;
+		border-radius: 6px;
+		transition: all 0.2s;
+		font-weight: 500;
+	}
+
+	.btn-link:hover {
+		background: var(--accent-secondary);
+		color: white;
+		border-color: var(--accent-secondary);
+		transform: translateY(-1px);
+		box-shadow: 0 2px 6px rgba(59, 130, 246, 0.3);
+	}
+
+	/* Botones de acción */
+	.help-text {
+		color: var(--text-muted);
+		font-size: 0.9rem;
+		margin: 0 0 20px;
+	}
+
+	.actions-grid {
+		display: grid;
+		grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+		gap: 16px;
+	}
+
+	.action-card {
+		background: var(--bg-secondary);
+		border: 1px solid var(--border-subtle);
+		border-radius: 8px;
+		padding: 20px;
+		display: flex;
+		flex-direction: column;
+		gap: 12px;
+		transition: all 0.2s;
+	}
+
+	.action-card:hover {
+		border-color: var(--border-medium);
+		box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+	}
+
+	.action-header {
+		display: flex;
+		align-items: center;
+		gap: 12px;
+		margin-bottom: 4px;
+	}
+
+	.action-icon {
+		font-size: 2rem;
+		line-height: 1;
+	}
+
+	.action-card h3 {
+		margin: 0;
+		font-size: 1rem;
+		font-weight: 600;
+		color: var(--text-primary);
+	}
+
+	.action-description {
+		color: var(--text-muted);
+		font-size: 0.875rem;
+		line-height: 1.5;
+		margin: 0;
+		flex-grow: 1;
+		min-height: 60px;
+	}
+
+	.action-card .btn {
+		margin-top: 4px;
+	}
+
+	.btn {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		gap: 8px;
+		padding: 12px 20px;
+		border: none;
+		border-radius: 6px;
+		font-weight: 600;
+		font-size: 0.95rem;
+		cursor: pointer;
+		transition: all 0.2s;
+	}
+
+	.btn .icon {
+		font-size: 1.2rem;
+	}
+
+	.btn-primary {
+		background: var(--accent-primary);
+		color: white;
+	}
+
+	.btn-primary:hover {
+		background: var(--accent-secondary);
+		transform: translateY(-2px);
+	}
+
+	.btn-secondary {
+		background: var(--bg-secondary);
+		color: var(--text-primary);
+		border: 1px solid var(--border-subtle);
+	}
+
+	.btn-secondary:hover {
+		background: var(--bg-card-hover);
+		border-color: var(--border-medium);
+	}
+
+	.btn-success {
+		background: #10b981;
+		color: white;
+		margin-top: 16px;
+	}
+
+	.btn-success:hover {
+		background: #059669;
+		transform: translateY(-2px);
+	}
+
+	/* Toggles de servicios automáticos */
+	.toggles-grid {
+		display: grid;
+		grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+		gap: 16px;
+		margin-bottom: 24px;
+	}
+
+	.toggle-item {
+		background: var(--bg-secondary);
+		border: 1px solid var(--border-subtle);
+		border-radius: 8px;
+		padding: 18px;
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		gap: 16px;
+		transition: all 0.2s;
+	}
+
+	.toggle-item:hover {
+		border-color: var(--border-medium);
+		box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+	}
+
+	.toggle-info {
+		flex: 1;
+		min-width: 0;
+	}
+
+	.toggle-label {
+		font-size: 0.9375rem;
+		font-weight: 600;
+		color: var(--text-primary);
+		display: block;
+		margin-bottom: 4px;
+	}
+
+	.toggle-description {
+		font-size: 0.8125rem;
+		color: var(--text-muted);
+		margin: 0;
+		line-height: 1.4;
+	}
+
+	/* Toggle Switch Styles */
+	.toggle-switch {
+		position: relative;
+		display: inline-block;
+		width: 52px;
+		height: 28px;
+		flex-shrink: 0;
+	}
+
+	.toggle-switch input {
+		opacity: 0;
+		width: 0;
+		height: 0;
+	}
+
+	.toggle-slider {
+		position: absolute;
+		cursor: pointer;
+		top: 0;
+		left: 0;
+		right: 0;
+		bottom: 0;
+		background-color: #cbd5e1;
+		transition: .3s;
+		border-radius: 28px;
+	}
+
+	.toggle-slider:before {
+		position: absolute;
+		content: "";
+		height: 20px;
+		width: 20px;
+		left: 4px;
+		bottom: 4px;
+		background-color: white;
+		transition: .3s;
+		border-radius: 50%;
+		box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+	}
+
+	.toggle-switch input:checked + .toggle-slider {
+		background-color: #10b981;
+	}
+
+	.toggle-switch input:checked + .toggle-slider:before {
+		transform: translateX(24px);
+	}
+
+	.toggle-switch input:disabled + .toggle-slider {
+		background-color: #e2e8f0;
+		cursor: not-allowed;
+	}
+
+	/* Configuración */
+	.config-grid {
+		display: grid;
+		grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+		gap: 20px;
+		margin-bottom: 16px;
+	}
+
+	.config-item {
+		display: flex;
+		flex-direction: column;
+		gap: 8px;
+	}
+
+	.config-item label {
+		font-size: 0.9rem;
+		font-weight: 500;
+		color: var(--text-secondary);
+	}
+
+	.input {
+		padding: 10px 14px;
+		border: 1px solid var(--border-subtle);
+		border-radius: 6px;
+		background: var(--bg-primary);
+		color: var(--text-primary);
+		font-size: 0.95rem;
+	}
+
+	.input:focus {
+		outline: none;
+		border-color: var(--accent-primary);
+	}
+
+	/* Logs */
+	.logs-container {
+		background: var(--bg-primary);
+		border: 1px solid var(--border-subtle);
+		border-radius: 6px;
+		padding: 16px;
+		max-height: 400px;
+		overflow-y: auto;
+		font-family: 'Courier New', monospace;
+		font-size: 0.875rem;
+	}
+
+	.log-entry {
+		padding: 6px 0;
+		border-bottom: 1px solid var(--border-subtle);
+		display: grid;
+		grid-template-columns: auto auto 1fr;
+		gap: 12px;
+		align-items: baseline;
+	}
+
+	.log-entry:last-child {
+		border-bottom: none;
+	}
+
+	.log-time {
+		color: var(--text-muted);
+		font-size: 0.8rem;
+	}
+
+	.log-level {
+		font-weight: 600;
+		padding: 2px 8px;
+		border-radius: 4px;
+		font-size: 0.75rem;
+	}
+
+	.log-info .log-level {
+		background: #3b82f6;
+		color: white;
+	}
+
+	.log-warn .log-level {
+		background: #f59e0b;
+		color: white;
+	}
+
+	.log-error .log-level {
+		background: #ef4444;
+		color: white;
+	}
+
+	.log-message {
+		color: var(--text-primary);
+	}
+
+	.loading, .error, .info {
+		text-align: center;
+		padding: 40px 20px;
+		color: var(--text-muted);
+	}
+
+	.error {
+		color: #ef4444;
+	}
+
+	.info {
+		color: var(--text-secondary);
+	}
+
+	@media (max-width: 768px) {
+		.scraper-monitor {
+			padding: 16px;
+		}
+
+		section {
+			padding: 16px;
+		}
+
+		.sources-grid {
+			grid-template-columns: 1fr;
+		}
+
+		.sources-actions {
+			flex-direction: column;
+		}
+
+		.btn-link {
+			width: 100%;
+			justify-content: center;
+		}
+
+		.actions-grid {
+			grid-template-columns: 1fr;
+		}
+
+		.action-description {
+			min-height: auto;
+		}
+
+		.config-grid {
+			grid-template-columns: 1fr;
+		}
+
+		.log-entry {
+			grid-template-columns: 1fr;
+			gap: 4px;
+		}
+	}
+</style>

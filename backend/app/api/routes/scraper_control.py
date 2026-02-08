@@ -5,10 +5,13 @@ Proxies requests to the scraper's internal control server.
 
 import os
 import httpx
-from fastapi import APIRouter, HTTPException, Request, Body
+from fastapi import APIRouter, HTTPException, Request, Body, Depends
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from typing import Optional, List
+
+from app.api.deps import get_current_user_optional
+from app.db.models import User
 
 router = APIRouter()
 
@@ -21,6 +24,12 @@ class RunNowRequest(BaseModel):
 
 
 class ConfigUpdate(BaseModel):
+    # Enable/Disable toggles
+    scrape_enabled: Optional[bool] = None
+    ai_process_enabled: Optional[bool] = None
+    auto_prepare_enabled: Optional[bool] = None
+    auto_publish_enabled: Optional[bool] = None
+    # Intervals
     scrape_interval_minutes: Optional[int] = None
     ai_process_interval_minutes: Optional[int] = None
     prepare_hours_ago: Optional[int] = None
@@ -142,12 +151,17 @@ async def stop_scraper():
 
 
 @router.post("/run-now")
-async def run_scraper_now(request: RunNowRequest = Body(default=None)):
+async def run_scraper_now(
+    request: RunNowRequest = Body(default=None),
+    current_user: User | None = Depends(get_current_user_optional)
+):
     """Trigger immediate scraping run, optionally for specific sources"""
-    data = None
+    data = {}
     if request and request.source_ids:
-        data = {"source_ids": request.source_ids}
-    return await proxy_post("/run-now", data)
+        data["source_ids"] = request.source_ids
+    if current_user:
+        data["user_id"] = str(current_user.id)
+    return await proxy_post("/run-now", data if data else None)
 
 
 @router.post("/process-ai")

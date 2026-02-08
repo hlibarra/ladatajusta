@@ -16,8 +16,12 @@ import asyncio
 import json
 from datetime import datetime
 from collections import deque
+from pathlib import Path
 from aiohttp import web
 from aiohttp.client_exceptions import ClientConnectionResetError
+
+# Config file path
+CONFIG_FILE = Path(__file__).parent / "config.json"
 
 
 class ScraperController:
@@ -36,19 +40,8 @@ class ScraperController:
         self.current_source = None  # Current source being scraped
         self.items_processed = {"scraped": 0, "ai_processed": 0, "prepared": 0, "curated": 0}
 
-        # Configuration (synced with env vars)
-        self.config = {
-            "scrape_interval_minutes": 60,
-            "ai_process_interval_minutes": 30,
-            "prepare_hours_ago": 24,
-            "selected_source_ids": None,  # None = all active sources
-            # Curator configuration
-            "curator_enabled": False,  # Auto-run curator on interval
-            "curator_interval_minutes": 120,  # How often to run curator
-            "curator_target_count": 12,  # How many items to publish
-            "curator_max_per_category": 3,
-            "curator_max_per_source": 3,
-        }
+        # Load configuration from file (or use defaults)
+        self.config = self._load_config()
 
         # Log buffer (last 1000 lines)
         self.log_buffer = deque(maxlen=1000)
@@ -59,6 +52,7 @@ class ScraperController:
         self.stop_requested = False
         self.run_now_requested = False
         self.run_source_ids = None  # List of source IDs to scrape (None = all active)
+        self.run_user_id = None  # User ID who triggered manual run
         self.process_ai_requested = False
         self.auto_prepare_requested = False
         self.auto_publish_requested = False
@@ -67,6 +61,53 @@ class ScraperController:
 
         # Start time
         self.start_time = datetime.now()
+
+    def _load_config(self) -> dict:
+        """Load configuration from file or return defaults"""
+        default_config = {
+            # Enable/Disable automatic services
+            "scrape_enabled": True,
+            "ai_process_enabled": True,
+            "auto_prepare_enabled": True,
+            "auto_publish_enabled": True,
+            # Intervals
+            "scrape_interval_minutes": 60,
+            "ai_process_interval_minutes": 30,
+            "prepare_hours_ago": 24,
+            "selected_source_ids": None,
+            # Curator configuration
+            "curator_enabled": False,
+            "curator_interval_minutes": 120,
+            "curator_target_count": 12,
+            "curator_max_per_category": 3,
+            "curator_max_per_source": 3,
+        }
+
+        try:
+            if CONFIG_FILE.exists():
+                with open(CONFIG_FILE, 'r') as f:
+                    saved_config = json.load(f)
+                    # Merge with defaults to handle new fields
+                    default_config.update(saved_config)
+                    print(f"[CONFIG] Loaded configuration from {CONFIG_FILE}")
+            else:
+                # Save default config
+                self._save_config(default_config)
+                print(f"[CONFIG] Created default configuration at {CONFIG_FILE}")
+        except Exception as e:
+            print(f"[CONFIG] Error loading config: {e}, using defaults")
+
+        return default_config
+
+    def _save_config(self, config: dict = None):
+        """Save configuration to file"""
+        try:
+            config_to_save = config if config is not None else self.config
+            with open(CONFIG_FILE, 'w') as f:
+                json.dump(config_to_save, f, indent=2)
+            print(f"[CONFIG] Saved configuration to {CONFIG_FILE}")
+        except Exception as e:
+            print(f"[CONFIG] Error saving config: {e}")
 
     def add_log(self, message: str, level: str = "INFO"):
         """Add a log entry and notify subscribers"""
@@ -113,15 +154,26 @@ class ScraperController:
         self.restart_requested = True
         self.add_log("Restart requested via API", "WARN")
 
+        # Notify via Telegram
+        try:
+            from telegram_notifier import get_notifier
+            notifier = get_notifier()
+            if notifier:
+                import asyncio
+                asyncio.create_task(notifier.notify_restart_requested())
+        except Exception:
+            pass  # Silently fail if Telegram not available
+
     def request_stop(self):
         """Request service stop"""
         self.stop_requested = True
         self.add_log("Stop requested via API", "WARN")
 
-    def request_run_now(self, source_ids: list = None):
+    def request_run_now(self, source_ids: list = None, user_id: str = None):
         """Request immediate scraping run"""
         self.run_now_requested = True
         self.run_source_ids = source_ids
+        self.run_user_id = user_id
         if source_ids:
             self.add_log(f"Immediate run requested for {len(source_ids)} source(s)", "INFO")
         else:
@@ -150,11 +202,25 @@ class ScraperController:
         self.add_log(f"News curation requested ({mode})", "INFO")
 
     def update_config(self, new_config: dict):
-        """Update configuration"""
+        """Update configuration and save to file"""
         for key, value in new_config.items():
             if key in self.config:
                 self.config[key] = value
+
+        # Save to file
+        self._save_config()
+
         self.add_log(f"Configuration updated: {new_config}", "INFO")
+
+        # Notify via Telegram
+        try:
+            from telegram_notifier import get_notifier
+            notifier = get_notifier()
+            if notifier:
+                import asyncio
+                asyncio.create_task(notifier.notify_config_changed(new_config))
+        except Exception:
+            pass  # Silently fail if Telegram not available
 
 
 # Global controller instance
@@ -237,13 +303,15 @@ async def handle_stop(request):
 async def handle_run_now(request):
     """POST /run-now - Run scraping immediately, optionally for specific sources"""
     source_ids = None
+    user_id = None
     try:
         data = await request.json()
         source_ids = data.get('source_ids')
+        user_id = data.get('user_id')
     except Exception:
         pass  # No JSON body or invalid JSON, run all sources
 
-    controller.request_run_now(source_ids)
+    controller.request_run_now(source_ids, user_id)
     if source_ids:
         return web.json_response({"success": True, "message": f"Immediate run requested for {len(source_ids)} source(s)"})
     return web.json_response({"success": True, "message": "Immediate run requested for all sources"})
@@ -296,6 +364,55 @@ async def handle_put_config(request):
         return web.json_response({"success": False, "error": str(e)}, status=400)
 
 
+async def handle_telegram_status(request):
+    """GET /telegram/status - Get Telegram notification status"""
+    try:
+        from telegram_notifier import get_notifier
+        notifier = get_notifier()
+
+        if not notifier:
+            return web.json_response({
+                "enabled": False,
+                "reason": "Not configured"
+            })
+
+        return web.json_response({
+            "enabled": notifier.enabled,
+            "queue_size": notifier.message_queue.qsize(),
+            "last_send_time": notifier.last_send_time.isoformat() if notifier.last_send_time else None,
+            "stats": notifier.stats
+        })
+    except Exception as e:
+        return web.json_response({
+            "enabled": False,
+            "error": str(e)
+        }, status=500)
+
+
+async def handle_telegram_test(request):
+    """POST /telegram/test - Send test notification"""
+    try:
+        from telegram_notifier import get_notifier
+        notifier = get_notifier()
+
+        if not notifier:
+            return web.json_response({
+                "success": False,
+                "error": "Telegram not configured"
+            }, status=400)
+
+        await notifier.send_test_message()
+        return web.json_response({
+            "success": True,
+            "message": "Test notification sent"
+        })
+    except Exception as e:
+        return web.json_response({
+            "success": False,
+            "error": str(e)
+        }, status=500)
+
+
 async def handle_cors_preflight(request):
     """Handle CORS preflight requests"""
     return web.Response(headers={
@@ -332,6 +449,8 @@ def create_app() -> web.Application:
     app.router.add_post('/curate', handle_curate)
     app.router.add_get('/config', handle_get_config)
     app.router.add_put('/config', handle_put_config)
+    app.router.add_get('/telegram/status', handle_telegram_status)
+    app.router.add_post('/telegram/test', handle_telegram_test)
     app.router.add_options('/{path:.*}', handle_cors_preflight)
 
     return app
