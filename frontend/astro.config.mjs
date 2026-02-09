@@ -10,6 +10,7 @@ export default defineConfig({
   }),
   vite: {
     server: {
+      allowedHosts: ['ladatajusta.com.ar', 'www.ladatajusta.com.ar'],
       watch: {
         usePolling: true,
         interval: 1000
