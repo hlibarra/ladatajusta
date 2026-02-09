@@ -66,11 +66,12 @@ async def get_sections(
         # Get all category names for this section
         category_names = [mapping.category_name for mapping in section.category_mappings]
 
-        # Count publications with those categories
+        # Count publications with those categories (case-insensitive)
         if category_names:
+            lower_categories = [c.lower() for c in category_names]
             count_query = select(func.count(Publication.id)).where(
                 Publication.state == "published",
-                Publication.category.in_(category_names)
+                func.lower(Publication.category).in_(lower_categories)
             )
             count_result = await db.execute(count_query)
             pub_count = count_result.scalar() or 0
@@ -133,12 +134,13 @@ async def get_section_publications(
             "offset": offset,
         }
 
-    # Get publications
+    # Get publications (case-insensitive category match)
+    lower_categories = [c.lower() for c in category_names]
     pub_query = (
         select(Publication)
         .where(
             Publication.state == "published",
-            Publication.category.in_(category_names)
+            func.lower(Publication.category).in_(lower_categories)
         )
         .order_by(Publication.published_at.desc())
         .limit(limit)
@@ -151,7 +153,7 @@ async def get_section_publications(
     # Count total
     count_query = select(func.count(Publication.id)).where(
         Publication.state == "published",
-        Publication.category.in_(category_names)
+        func.lower(Publication.category).in_(lower_categories)
     )
     count_result = await db.execute(count_query)
     total = count_result.scalar() or 0
@@ -277,12 +279,13 @@ async def get_section_detail(
     if not section:
         raise HTTPException(status_code=404, detail="Section not found")
 
-    # Get publication count
+    # Get publication count (case-insensitive)
     category_names = [mapping.category_name for mapping in section.category_mappings]
     if category_names:
+        lower_categories = [c.lower() for c in category_names]
         count_query = select(func.count(Publication.id)).where(
             Publication.state == "published",
-            Publication.category.in_(category_names)
+            func.lower(Publication.category).in_(lower_categories)
         )
         count_result = await db.execute(count_query)
         pub_count = count_result.scalar() or 0

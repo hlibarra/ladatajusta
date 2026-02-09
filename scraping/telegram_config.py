@@ -108,7 +108,7 @@ class MessageTemplates:
 
 ⏰ {timestamp}"""
 
-    CURATOR_COMPLETE = """🎯 <b>Curación de Noticias Completada</b>
+    CURATOR_COMPLETE = """🎯 <b>Revisión de Noticias Completada</b>
 
 📊 Resultados:
 • Publicados: {published}

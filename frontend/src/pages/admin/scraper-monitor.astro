@@ -87,12 +87,12 @@ const title = 'Monitor de Scraping';
 				<div class="action-card">
 					<div class="action-header">
 						<span class="action-icon">✨</span>
-						<h3>4. Curar y Publicar</h3>
+						<h3>4. Revisar y Publicar</h3>
 					</div>
 					<p class="action-description">Selecciona los mejores artículos "ready" según scoring y los publica automáticamente en la página</p>
 					<button class="btn btn-secondary" id="btn-curate">
 						<span class="icon">✨</span>
-						Curar y Publicar
+						Revisar y Publicar
 					</button>
 				</div>
 			</div>
@@ -454,9 +454,9 @@ const title = 'Monitor de Scraping';
 		}
 	});
 
-	// Curar y publicar
+	// Revisar y publicar
 	document.getElementById('btn-curate')?.addEventListener('click', async () => {
-		if (!confirm('¿Curar y publicar noticias ahora?')) return;
+		if (!confirm('¿Revisar y publicar noticias ahora?')) return;
 
 		try {
 			const res = await authFetch('/api/scraper/curate', {
@@ -464,12 +464,12 @@ const title = 'Monitor de Scraping';
 				body: JSON.stringify({ dry_run: false })
 			});
 
-			if (!res.ok) throw new Error('Error al curar');
+			if (!res.ok) throw new Error('Error al revisar');
 
-			alert('Curación iniciada');
+			alert('Revisión iniciada');
 		} catch (error) {
 			console.error('Error curating:', error);
-			alert('Error al curar noticias');
+			alert('Error al revisar noticias');
 		}
 	});
 

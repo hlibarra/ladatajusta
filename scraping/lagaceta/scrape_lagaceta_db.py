@@ -351,9 +351,10 @@ async def main():
     try:
         # Iniciar Playwright
         async with async_playwright() as p:
+            is_headless = os.environ.get("HEADLESS", "true").lower() == "true"
             context = await p.chromium.launch_persistent_context(
                 user_data_dir=".user_data",
-                headless=False
+                headless=is_headless
             )
             page = await context.new_page()
 

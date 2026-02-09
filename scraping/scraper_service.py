@@ -775,7 +775,9 @@ async def curate_news(dry_run: bool = False):
             await pool.close()
 
     except Exception as e:
-        log(f"Curation error: {e}", "ERROR")
+        import traceback
+        log(f"Curation error: {type(e).__name__}: {e}", "ERROR")
+        log(f"Curation traceback: {traceback.format_exc()}", "ERROR")
         # Notify error
         if telegram_notifier:
             try:

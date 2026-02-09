@@ -1,8 +1,15 @@
 ---
 interface Props {
 	title?: string;
+	description?: string;
+	image?: string;
 }
-const { title = 'La Data Justa' } = Astro.props;
+const {
+	title = 'La Data Justa',
+	description = 'Noticias cortas, claras y directas al punto.',
+	image = '/images/logo.png'
+} = Astro.props;
+const canonicalURL = new URL(Astro.url.pathname, 'https://ladatajusta.com.ar');
 
 // In SSR (this file), always use internal HTTP URL
 const API_BASE = import.meta.env.PUBLIC_API_BASE_URL || 'http://backend:8000';
@@ -44,7 +51,24 @@ const activeSections = sections.filter(s => s.is_active).slice(0, 6);
 		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
 
 		<meta name="generator" content={Astro.generator} />
-		<meta name="description" content="Noticias cortas, claras y directas al punto." />
+		<meta name="description" content={description} />
+		<link rel="canonical" href={canonicalURL.href} />
+
+		<!-- Open Graph -->
+		<meta property="og:type" content="website" />
+		<meta property="og:url" content={canonicalURL.href} />
+		<meta property="og:title" content={title} />
+		<meta property="og:description" content={description} />
+		<meta property="og:image" content={`https://ladatajusta.com.ar${image}`} />
+		<meta property="og:site_name" content="La Data Justa" />
+		<meta property="og:locale" content="es_AR" />
+
+		<!-- Twitter -->
+		<meta name="twitter:card" content="summary_large_image" />
+		<meta name="twitter:title" content={title} />
+		<meta name="twitter:description" content={description} />
+		<meta name="twitter:image" content={`https://ladatajusta.com.ar${image}`} />
+
 		<title>{title}</title>
 
 		<!-- Google Analytics 4 -->
